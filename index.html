@@ -262,7 +262,7 @@
 <div class="section" id="tab-welkom" style="display:block">
   <div class="landing-hero">
     <h1>Welkom</h1>
-    <p>Hieronder een korte beschrijving hoe deze omgeving te gebruiken. Dit is een vervanging van onze "ouderwetse" materiaallijsten.</p>
+    <p>Hieronder een korte beschrijving hoe deze omgeving te gebruiken</p>
   </div>
   <div style="background:#e8471a;border-radius:var(--radius);padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;gap:14px">
     <div style="font-size:1.8rem;flex-shrink:0">⏰</div>
@@ -373,7 +373,7 @@
     </div>
     <div class="field-row">
       <label>E-mail ontvanger 2 (optioneel)</label>
-      <input type="email" id="ontvanger2" placeholder="inkoop@emondt.nl" oninput="saveInfo()" />
+      <input type="email" id="ontvanger2" placeholder="jouw e-mailadres" oninput="saveInfo()" />
     </div>
     <div class="field-row">
       <label>Opmerkingen (optioneel)</label>
@@ -420,6 +420,24 @@
 <!-- DEV BEHEER PAGINA -->
 <div class="section" id="tab-dev" style="display:none">
   <div class="info-card">
+    <h2>🔗 Google Sheets koppeling</h2>
+    <div class="csv-info">
+      Plak hier de <strong>Web App URL</strong> van het Google Apps Script.<br>
+      Zie de installatiehandleiding (README) voor stap-voor-stap instructies.
+    </div>
+    <div class="field-row">
+      <label>Web App URL</label>
+      <input type="url" id="sheets-url" placeholder="https://script.google.com/macros/s/.../exec"
+        oninput="slaApiUrlOp()" style="font-size:.78rem" />
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn btn-primary" onclick="testSheetsVerbinding()" style="margin-bottom:0;flex:1">🔍 Verbinding testen</button>
+      <button class="btn btn-primary" onclick="herlaadArtikelenDev()" style="margin-bottom:0;flex:1">🔄 Artikelen herladen</button>
+    </div>
+    <div id="sheets-status" style="margin-top:8px;font-size:.78rem"></div>
+  </div>
+
+  <div class="info-card">
     <h2>➕ Artikel toevoegen aan database</h2>
     <div class="field-row-2">
       <div class="field-row">
@@ -448,6 +466,10 @@
     <div class="field-row" id="dev-subcat-wrap" style="display:none">
       <label>Subcategorie (optioneel)</label>
       <input type="text" id="dev-subcat" placeholder="bijv. Bochten 90° M/M" />
+    </div>
+    <div class="field-row">
+      <label>Leverancier (optioneel)</label>
+      <input type="text" id="dev-leverancier" placeholder="bijv. Heideveld" />
     </div>
     <button class="btn btn-primary" onclick="devVoegToe()" style="margin-bottom:0">➕ Toevoegen</button>
   </div>
@@ -607,7 +629,12 @@
 <div id="toast">✓ Toegevoegd</div>
 
 <script>
-const ARTIKELEN = [
+// ── GOOGLE SHEETS API ────────────────────────────────────────
+// Vervang de URL hieronder met jouw Web App URL na deployment
+const SHEETS_API_URL = 'JOUW_WEBAPP_URL_HIER';
+
+// ── FALLBACK DATABASE (gebruikt als Sheets niet beschikbaar) ──
+const ARTIKELEN_FALLBACK = [
   // Afvoermaterialen
   { code: '6809804', naam: 'PVC afvoerbuis 20 mm', cat: 'Afvoermaterialen', subcat: 'Buizen', eenheid: 'stuk', icon: '🔧' },
   { code: '2324430', naam: 'PVC afvoerbuis 25 mm', cat: 'Afvoermaterialen', subcat: 'Buizen', eenheid: 'stuk', icon: '🔧' },
@@ -869,6 +896,8 @@ const ARTIKELEN = [
   { code: '8483919', naam: 'Flowfit systeembuis D25 10mm iso rol 25mtr (rood)', cat: 'Waterzijdig', subcat: 'Flowfit', eenheid: 'stuk', icon: '💧' },
 ];
 
+let ARTIKELEN = [];  // wordt geladen vanuit Google Sheets (of fallback)
+
 const CAT_IDS = {
   'Afvoermaterialen':'di-afvoer','Bevestigingsmateriaal':'di-bevestiging',
   'Diversen':'di-diversen','Elektra':'di-elektra','Isolatie':'di-isolatie',
@@ -882,6 +911,16 @@ const ICONS = {
 };
 
 let cart = {};
+
+function saveCart() {
+  try { localStorage.setItem('emondt_cart', JSON.stringify(cart)); } catch(e) {}
+}
+function loadCart() {
+  try {
+    const opgeslagen = localStorage.getItem('emondt_cart');
+    if (opgeslagen) cart = JSON.parse(opgeslagen);
+  } catch(e) {}
+}
 let activeCat = null;
 let customTeller = 0;
 let extraArtikelen = [];
@@ -889,10 +928,102 @@ let extraArtikelen = [];
 // ── INIT ──────────────────────────────────────────────────────
 window.onload = () => {
   loadInfo();
+  loadCart();
   document.getElementById('di-all').classList.add('active');
-  renderArtikelen(ARTIKELEN);
   showTab('welkom');
+  laadArtikelenUitSheets();
 };
+
+// ── LADEN UIT GOOGLE SHEETS ───────────────────────────────────
+function laadArtikelenUitSheets() {
+  const lijst = document.getElementById('artikel-lijst');
+  if (lijst) lijst.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--muted);font-size:.86rem">📡 Artikelen laden...</div>';
+
+  // Probeer eerst lokale cache
+  try {
+    const cached = localStorage.getItem('emondt_artikelen_cache');
+    const ts     = localStorage.getItem('emondt_artikelen_ts');
+    const oud    = !ts || (Date.now() - parseInt(ts)) > 3600000; // 1 uur cache
+    if (cached && !oud) {
+      ARTIKELEN = JSON.parse(cached);
+      renderArtikelen(ARTIKELEN);
+      console.log('[Sheets] Geladen uit cache:', ARTIKELEN.length, 'artikelen');
+      // Op achtergrond toch verversen
+      fetchSheets(false);
+      return;
+    }
+  } catch(e) {}
+
+  fetchSheets(true);
+}
+
+function fetchSheets(toonLaadindicator) {
+  const effectiveUrl = window.SHEETS_API_URL_RUNTIME ||
+    (() => { try { return localStorage.getItem('emondt_sheets_url') || ''; } catch(e){ return ''; } })() ||
+    SHEETS_API_URL;
+  if (!effectiveUrl || effectiveUrl === 'JOUW_WEBAPP_URL_HIER') {
+    // Geen API URL ingesteld — gebruik lege array en toon melding
+    // Geen Sheets URL — gebruik fallback database
+    ARTIKELEN = ARTIKELEN_FALLBACK.slice();
+    renderArtikelen(ARTIKELEN);
+    console.log('[Sheets] Geen URL ingesteld — fallback database geladen:', ARTIKELEN.length, 'artikelen');
+    return;
+  }
+
+  fetch(effectiveUrl + '?t=' + Date.now())
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 'ok' && Array.isArray(data.artikelen)) {
+        ARTIKELEN = data.artikelen.map(a => ({
+          code:    a.code    || '',
+          naam:    a.naam    || '',
+          cat:     a.cat     || '',
+          subcat:  a.subcat  || undefined,
+          eenheid:     a.eenheid     || 'stuk',
+          leverancier: a.leverancier || '',
+          icon:        ICONS[a.cat]  || '📦',
+        })).filter(a => a.code && a.naam);
+
+        // Sla op in cache
+        try {
+          localStorage.setItem('emondt_artikelen_cache', JSON.stringify(ARTIKELEN));
+          localStorage.setItem('emondt_artikelen_ts', Date.now().toString());
+        } catch(e) {}
+
+        renderArtikelen(ARTIKELEN);
+        console.log('[Sheets] Geladen:', ARTIKELEN.length, 'artikelen');
+        showToast('✓ ' + ARTIKELEN.length + ' artikelen geladen');
+      } else {
+        console.error('[Sheets] Fout:', data);
+        toonSheetsError('Fout bij laden: ' + (data.message || 'onbekend'));
+      }
+    })
+    .catch(err => {
+      console.error('[Sheets] Netwerkfout:', err);
+      // Probeer cache als fallback
+      try {
+        const cached = localStorage.getItem('emondt_artikelen_cache');
+        if (cached) {
+          ARTIKELEN = JSON.parse(cached);
+          renderArtikelen(ARTIKELEN);
+          showToast('📵 Offline – cache gebruikt');
+          return;
+        }
+      } catch(e) {}
+      // Geen verbinding, geen cache → fallback
+      ARTIKELEN = ARTIKELEN_FALLBACK.slice();
+      renderArtikelen(ARTIKELEN);
+      showToast('📵 Offline – lokale database geladen');
+    });
+}
+
+function toonSheetsError(msg) {
+  console.warn('[Sheets]', msg, '→ Fallback database wordt geladen');
+  ARTIKELEN = ARTIKELEN_FALLBACK.slice();
+  renderArtikelen(ARTIKELEN);
+  showToast('📦 Lokale database geladen');
+  const lijst = document.getElementById('artikel-lijst');
+}
 
 // ── DRAWER ────────────────────────────────────────────────────
 function toggleDrawer() {
@@ -970,7 +1101,7 @@ function renderArtikelCard(artikel, container) {
     <div class="artikel-icon">${artikel.icon}</div>
     <div class="artikel-info">
       <div class="artikel-naam">${artikel.naam}</div>
-      <div class="artikel-code">${artikel.code} · per ${artikel.eenheid}</div>
+      <div class="artikel-code">${artikel.code}${artikel.leverancier ? ' · ' + artikel.leverancier : ''} · per ${artikel.eenheid}</div>
     </div>
     <div class="qty-control" onclick="event.stopPropagation()">
       <button class="qty-btn" onclick="changeQty('${artikel.code}',-1,event)">−</button>
@@ -997,6 +1128,7 @@ function setQty(code, input) {
 
 function _setCart(code, nieuw) {
   if (nieuw === 0) delete cart[code]; else cart[code] = nieuw;
+  saveCart();
   const qEl = document.getElementById('qty-' + code);
   const cEl = document.getElementById('card-' + code);
   if (qEl) qEl.value = nieuw;
@@ -1103,6 +1235,7 @@ function removeItem(code) {
 function leegMaken() {
   if (!confirm('Hele bestelling wissen?')) return;
   cart = {};
+  try { localStorage.removeItem('emondt_cart'); } catch(e){}
   document.querySelectorAll('.qty-val').forEach(el => el.value = 0);
   document.querySelectorAll('.artikel-card').forEach(el => el.classList.remove('selected'));
   updateBadge(); renderCart();
@@ -1201,9 +1334,14 @@ function saveInfo() {
 function loadInfo() {
   try {
     const s = JSON.parse(localStorage.getItem('emondt_info')||'{}');
+    // Nieuwe sessie = projectnummer en projectnaam wissen
+    const nieuweSessione = !sessionStorage.getItem('sessie_gestart');
+    sessionStorage.setItem('sessie_gestart', '1');
     ['naam','afdeling','projectnummer','projectnaam','locatie','ontvanger2','opmerkingen'].forEach(id => {
       const el = document.getElementById(id);
-      if (el && s[id] && id !== 'ontvanger') el.value = s[id];
+      if (!el || id === 'ontvanger') return;
+      if (nieuweSessione && (id === 'projectnummer' || id === 'projectnaam')) return; // wis bij nieuwe sessie
+      if (s[id]) el.value = s[id];
     });
     // Projectnummer: gebruik opgeslagen waarde of laat placeholder zien
     const pnr = document.getElementById('projectnummer');
@@ -1260,18 +1398,76 @@ function customArtikelToevoegen() {
 // ── DEV BEHEER ────────────────────────────────────────────────
 const DEV_PW = 'Eg@2026!#';
 
+function slaApiUrlOp() {
+  const url = document.getElementById('sheets-url').value.trim();
+  // Update runtime
+  window.SHEETS_API_URL_RUNTIME = url;
+  try { localStorage.setItem('emondt_sheets_url', url); } catch(e) {}
+}
+
+function testSheetsVerbinding() {
+  const url = document.getElementById('sheets-url').value.trim();
+  const status = document.getElementById('sheets-status');
+  if (!url) { status.innerHTML = '<span style="color:var(--danger)">⚠️ Vul eerst een URL in.</span>'; return; }
+  status.innerHTML = '<span style="color:var(--muted)">⏳ Verbinding testen...</span>';
+  fetch(url + '?t=' + Date.now())
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 'ok') {
+        status.innerHTML = `<span style="color:green">✅ Verbinding OK — ${data.count} artikelen gevonden.</span>`;
+      } else {
+        status.innerHTML = `<span style="color:var(--danger)">❌ Fout: ${data.message || JSON.stringify(data)}</span>`;
+      }
+    })
+    .catch(err => {
+      status.innerHTML = `<span style="color:var(--danger)">❌ Geen verbinding: ${err.message}</span>`;
+    });
+}
+
+function herlaadArtikelenDev() {
+  const url = document.getElementById('sheets-url').value.trim();
+  if (url) {
+    window.SHEETS_API_URL_RUNTIME = url;
+    try { localStorage.setItem('emondt_sheets_url', url); } catch(e) {}
+  }
+  try { localStorage.removeItem('emondt_artikelen_ts'); } catch(e) {} // invalideer cache
+  laadArtikelenUitSheets();
+  showToast('🔄 Artikelen worden herladen...');
+  showTab('artikelen');
+}
+
 function openDev() {
+  // Al ingelogd in deze sessie?
+  if (sessionStorage.getItem('dev_auth') === '1') {
+    closeDrawer();
+    showTab('dev');
+    devRenderExtraLijst();
+    initDevPage();
+    return;
+  }
+  closeDrawer();
   document.getElementById('dev-overlay').classList.add('open');
   document.getElementById('dev-pw').value = '';
   document.getElementById('dev-pw-err').style.display = 'none';
   setTimeout(() => document.getElementById('dev-pw').focus(), 100);
 }
 
+function initDevPage() {
+  // Herstel opgeslagen Sheets URL
+  try {
+    const opgeslagen = localStorage.getItem('emondt_sheets_url') || '';
+    const urlInput = document.getElementById('sheets-url');
+    if (urlInput && opgeslagen) urlInput.value = opgeslagen;
+  } catch(e) {}
+}
+
 function checkPw() {
   if (document.getElementById('dev-pw').value === DEV_PW) {
+    sessionStorage.setItem('dev_auth', '1');
     document.getElementById('dev-overlay').classList.remove('open');
     showTab('dev');
     devRenderExtraLijst();
+    initDevPage();
   } else {
     document.getElementById('dev-pw-err').style.display = 'block';
     document.getElementById('dev-pw').value = '';
@@ -1288,18 +1484,21 @@ function devVoegToe() {
   const naam = document.getElementById('dev-naam').value.trim();
   const cat  = document.getElementById('dev-cat').value;
   const eenheid = document.getElementById('dev-eenheid').value.trim() || 'stuk';
-  const subcat  = document.getElementById('dev-subcat').value.trim();
+  const subcat      = document.getElementById('dev-subcat').value.trim();
+  const leverancier = document.getElementById('dev-leverancier')?.value.trim() || '';
   if (!code) { alert('Vul een artikelnummer in.'); return; }
   if (!naam)  { alert('Vul een naam in.'); return; }
   if (!cat)   { alert('Selecteer een categorie.'); return; }
   if (ARTIKELEN.find(a=>a.code===code)||extraArtikelen.find(a=>a.code===code)) { alert('Artikelnummer bestaat al.'); return; }
   const nieuw = {code,naam,cat,eenheid,icon:ICONS[cat]||'📦'};
   if (subcat) nieuw.subcat = subcat;
+  if (leverancier) nieuw.leverancier = leverancier;
   ARTIKELEN.push(nieuw); extraArtikelen.push(nieuw);
   document.getElementById('dev-code').value = '';
   document.getElementById('dev-naam').value = '';
   document.getElementById('dev-eenheid').value = 'stuk';
   document.getElementById('dev-subcat').value = '';
+  const lev = document.getElementById('dev-leverancier'); if (lev) lev.value = '';
   devRenderExtraLijst();
   showToast('✓ Artikel toegevoegd');
 }
@@ -1412,7 +1611,7 @@ function csvExportDatabase() {
   const regels = [
     `# Emondt Materiaalapp - Database export ${datum}`,
     `# Totaal: ${ARTIKELEN.length} artikelen`,
-    `# Kolommen: code,naam,cat,subcat,eenheid`,
+    `# Kolommen: code,naam,cat,subcat,eenheid,leverancier`,
     '',
     ...ARTIKELEN.map(a => [
       esc(a.code),
@@ -1420,6 +1619,7 @@ function csvExportDatabase() {
       esc(a.cat),
       esc(a.subcat || ''),
       esc(a.eenheid || 'stuk'),
+      esc(a.leverancier || ''),
     ].join(','))
   ];
 
@@ -1571,6 +1771,7 @@ function devBewerkArtikel(code) {
   document.getElementById('edit-cat').value = a.cat;
   document.getElementById('edit-subcat').value = a.subcat || '';
   document.getElementById('edit-eenheid').value = a.eenheid || 'stuk';
+  const elev = document.getElementById('edit-leverancier'); if (elev) elev.value = a.leverancier || '';
   document.getElementById('dev-edit-card').scrollIntoView({behavior:'smooth', block:'start'});
 }
 
@@ -1581,14 +1782,15 @@ function devSlaBewerking() {
   const newCode = document.getElementById('edit-code').value.trim();
   const naam    = document.getElementById('edit-naam').value.trim();
   const cat     = document.getElementById('edit-cat').value;
-  const subcat  = document.getElementById('edit-subcat').value.trim();
-  const eenheid = document.getElementById('edit-eenheid').value.trim() || 'stuk';
+  const subcat      = document.getElementById('edit-subcat').value.trim();
+  const eenheid     = document.getElementById('edit-eenheid').value.trim() || 'stuk';
+  const leverancier = document.getElementById('edit-leverancier')?.value.trim() || '';
   if (!newCode || !naam) { alert('Code en naam zijn verplicht.'); return; }
   // Check duplicate code (only if changed)
   if (newCode !== origCode && ARTIKELEN.find(x => x.code === newCode)) {
     alert('Dit artikelnummer bestaat al.'); return;
   }
-  ARTIKELEN[idx] = { code: newCode, naam, cat, eenheid, icon: ICONS[cat] || '📦', ...(subcat ? {subcat} : {}) };
+  ARTIKELEN[idx] = { code: newCode, naam, cat, eenheid, icon: ICONS[cat] || '📦', ...(subcat ? {subcat} : {}), ...(leverancier ? {leverancier} : {}) };
   // Update cart key if code changed
   if (newCode !== origCode && cart[origCode] !== undefined) {
     cart[newCode] = cart[origCode];
