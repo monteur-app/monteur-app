@@ -1409,18 +1409,33 @@ function testSheetsVerbinding() {
   const url = document.getElementById('sheets-url').value.trim();
   const status = document.getElementById('sheets-status');
   if (!url) { status.innerHTML = '<span style="color:var(--danger)">⚠️ Vul eerst een URL in.</span>'; return; }
+  if (!url.startsWith('https://script.google.com')) {
+    status.innerHTML = '<span style="color:var(--danger)">⚠️ URL moet beginnen met https://script.google.com/macros/s/...</span>'; return;
+  }
   status.innerHTML = '<span style="color:var(--muted)">⏳ Verbinding testen...</span>';
   fetch(url + '?t=' + Date.now())
-    .then(r => r.json())
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status} – ${r.statusText}`);
+      return r.json();
+    })
     .then(data => {
       if (data.status === 'ok') {
-        status.innerHTML = `<span style="color:green">✅ Verbinding OK — ${data.count} artikelen gevonden.</span>`;
+        status.innerHTML = `<span style="color:green">✅ Verbinding OK — ${data.count} artikelen gevonden in de Sheet.</span>`;
       } else {
-        status.innerHTML = `<span style="color:var(--danger)">❌ Fout: ${data.message || JSON.stringify(data)}</span>`;
+        status.innerHTML = `<span style="color:var(--danger)">❌ Script fout: ${data.message || JSON.stringify(data)}</span>`;
       }
     })
     .catch(err => {
-      status.innerHTML = `<span style="color:var(--danger)">❌ Geen verbinding: ${err.message}</span>`;
+      let hulp = '';
+      if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+        hulp = `<br><br><strong>Mogelijke oorzaken:</strong><br>
+        1. Script nog niet (opnieuw) gedeployed na wijziging<br>
+        2. Toegang staat niet op <strong>"Iedereen"</strong> — controleer deploy-instellingen<br>
+        3. SHEET_ID is nog niet ingevuld in het script<br>
+        4. Je browser blokkeert de aanvraag (probeer een andere browser)<br><br>
+        <strong>Oplossing:</strong> Ga naar script.google.com → Implementeren → Nieuwe implementatie → Webapplicatie → Toegang: Iedereen → Implementeren. Kopieer de <em>nieuwe</em> URL.`;
+      }
+      status.innerHTML = `<span style="color:var(--danger)">❌ Geen verbinding: ${err.message}${hulp}</span>`;
     });
 }
 
@@ -1809,7 +1824,7 @@ function devAnnuleerBewerking() {
 </script>
 <!-- ── FOOTER ── -->
 <footer style="text-align:center;padding:20px 16px;margin-top:8px;font-size:.72rem;color:var(--muted);letter-spacing:.06em;border-top:1px solid var(--border)">
-  Ontworpen door Ruben Brinks V2.1
+  Ontworpen door Ruben Brinks
 </footer>
 
 <!-- ── PWA INSTALL BANNER ── -->
