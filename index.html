@@ -440,39 +440,14 @@
 
   <div class="info-card">
     <h2>➕ Artikel toevoegen aan database</h2>
-    <div class="field-row-2">
-      <div class="field-row">
-        <label>Artikelnummer <span class="req">*</span></label>
-        <input type="text" id="dev-code" placeholder="bijv. 99XX0001" />
-      </div>
-      <div class="field-row">
-        <label>Eenheid</label>
-        <input type="text" id="dev-eenheid" placeholder="stuk" value="stuk" />
-      </div>
+    <div style="font-size:.84rem;color:var(--muted);line-height:1.6;margin-bottom:14px">
+      Artikelen worden beheerd via Google Sheets. Klik op de knop hieronder om de spreadsheet te openen en artikelen toe te voegen of aan te passen.
     </div>
-    <div class="field-row">
-      <label>Naam / Omschrijving <span class="req">*</span></label>
-      <input type="text" id="dev-naam" placeholder="bijv. Koppelstuk 22mm" />
-    </div>
-    <div class="field-row">
-      <label>Categorie <span class="req">*</span></label>
-      <select id="dev-cat" onchange="devCatChange()">
-        <option value="">Selecteer categorie...</option>
-        <option>Afvoermaterialen</option><option>Bevestigingsmateriaal</option>
-        <option>Diversen</option><option>Elektra</option><option>Isolatie</option>
-        <option>Koeltechnische hulpstukken</option><option>Koperleiding</option>
-        <option>Tape &amp; Lijmen</option><option>Waterzijdig</option>
-      </select>
-    </div>
-    <div class="field-row" id="dev-subcat-wrap" style="display:none">
-      <label>Subcategorie (optioneel)</label>
-      <input type="text" id="dev-subcat" placeholder="bijv. Bochten 90° M/M" />
-    </div>
-    <div class="field-row">
-      <label>Leverancier (optioneel)</label>
-      <input type="text" id="dev-leverancier" placeholder="bijv. Heideveld" />
-    </div>
-    <button class="btn btn-primary" onclick="devVoegToe()" style="margin-bottom:0">➕ Toevoegen</button>
+    <a href="https://docs.google.com/spreadsheets/d/1nVAoYUlm_MGBsFLvH2QsZmuZooqkxbsibreMykhPGws/edit" target="_blank" style="text-decoration:none">
+      <button class="btn btn-primary" style="margin-bottom:0">
+        📊 Open Google Spreadsheet
+      </button>
+    </a>
   </div>
 
   <div class="info-card">
@@ -558,23 +533,41 @@ window.onload = () => {
 // ── LADEN UIT GOOGLE SHEETS ───────────────────────────────────
 function laadArtikelenUitSheets() {
   const lijst = document.getElementById('artikel-lijst');
-  if (lijst) lijst.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--muted);font-size:.86rem">📡 Artikelen laden...</div>';
 
-  // Probeer eerst lokale cache
+  // ── Laag 1: sessionStorage (snelst, huidige browsersessie) ──
   try {
-    const cached = localStorage.getItem('emondt_artikelen_cache');
-    const ts     = localStorage.getItem('emondt_artikelen_ts');
-    const oud    = !ts || (Date.now() - parseInt(ts)) > 3600000; // 1 uur cache
-    if (cached && !oud) {
-      ARTIKELEN = JSON.parse(cached);
+    const sesCache = sessionStorage.getItem('emondt_artikelen_sessie');
+    if (sesCache) {
+      ARTIKELEN = JSON.parse(sesCache);
+      bouwDrawerCats();
       renderArtikelen(ARTIKELEN);
-      console.log('[Sheets] Geladen uit cache:', ARTIKELEN.length, 'artikelen');
-      // Op achtergrond toch verversen
+      console.log('[Cache] Sessiecache geladen:', ARTIKELEN.length, 'artikelen');
+      // Ververs op achtergrond zonder laad-indicator
       fetchSheets(false);
       return;
     }
   } catch(e) {}
 
+  // ── Laag 2: localStorage (tot 24 uur geldig) ─────────────
+  if (lijst) lijst.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--muted);font-size:.86rem">📡 Artikelen laden...</div>';
+  try {
+    const cached = localStorage.getItem('emondt_artikelen_cache');
+    const ts     = localStorage.getItem('emondt_artikelen_ts');
+    const oud    = !ts || (Date.now() - parseInt(ts)) > 86400000; // 24 uur
+    if (cached && !oud) {
+      ARTIKELEN = JSON.parse(cached);
+      // Zet ook in sessiecache
+      try { sessionStorage.setItem('emondt_artikelen_sessie', cached); } catch(e) {}
+      bouwDrawerCats();
+      renderArtikelen(ARTIKELEN);
+      console.log('[Cache] LocalStorage cache geladen:', ARTIKELEN.length, 'artikelen');
+      // Ververs op achtergrond
+      fetchSheets(false);
+      return;
+    }
+  } catch(e) {}
+
+  // ── Laag 3: Sheets ophalen ────────────────────────────────
   fetchSheets(true);
 }
 
@@ -583,65 +576,77 @@ function fetchSheets(toonLaadindicator) {
     (() => { try { return localStorage.getItem('emondt_sheets_url') || ''; } catch(e){ return ''; } })() ||
     SHEETS_API_URL;
   if (!effectiveUrl || effectiveUrl === 'JOUW_WEBAPP_URL_HIER') {
-    // Geen API URL ingesteld — gebruik lege array en toon melding
-    // Geen Sheets URL ingesteld
-    const lijst = document.getElementById('artikel-lijst');
-    if (lijst) lijst.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--muted);font-size:.86rem">⚙️ Koppel de Google Sheets API in de beheerpagina (hamburgermenu → Beheer).</div>';
+    // Geen URL — toon cache als die er is, anders melding
+    const cached = (() => { try { return localStorage.getItem('emondt_artikelen_cache'); } catch(e){ return null; } })();
+    if (cached) {
+      ARTIKELEN = JSON.parse(cached);
+      bouwDrawerCats();
+      renderArtikelen(ARTIKELEN);
+      showToast('📦 Gecachte database geladen');
+    } else {
+      const lijst = document.getElementById('artikel-lijst');
+      if (lijst) lijst.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--muted);font-size:.86rem">⚙️ Koppel de Google Sheets API in de beheerpagina (hamburgermenu → Beheer).</div>';
+    }
     return;
   }
 
-  fetch(effectiveUrl + '?t=' + Date.now())
+  fetch(effectiveUrl + '?actie=lezen&t=' + Date.now())
     .then(r => r.json())
     .then(data => {
       if (data.status === 'ok' && Array.isArray(data.artikelen)) {
         ARTIKELEN = data.artikelen.map(a => ({
-          code:    a.code    || '',
-          naam:    a.naam    || '',
-          cat:     a.cat     || '',
-          subcat:  a.subcat  || undefined,
+          code:        a.code        || '',
+          naam:        a.naam        || '',
+          cat:         a.cat         || '',
+          subcat:      a.subcat      || undefined,
           eenheid:     a.eenheid     || 'stuk',
           leverancier: a.leverancier || '',
           icon:        ICONS[a.cat] || ICON_DEFAULTS[a.cat] || '📦',
         })).filter(a => a.code && a.naam);
 
-        // Sla op in cache
+        // Opslaan in beide caches
+        const json = JSON.stringify(ARTIKELEN);
         try {
-          localStorage.setItem('emondt_artikelen_cache', JSON.stringify(ARTIKELEN));
+          localStorage.setItem('emondt_artikelen_cache', json);
           localStorage.setItem('emondt_artikelen_ts', Date.now().toString());
+          sessionStorage.setItem('emondt_artikelen_sessie', json);
         } catch(e) {}
 
         bouwDrawerCats();
         renderArtikelen(ARTIKELEN);
         console.log('[Sheets] Geladen:', ARTIKELEN.length, 'artikelen');
-        showToast('✓ ' + ARTIKELEN.length + ' artikelen geladen');
+        if (toonLaadindicator) showToast('✓ ' + ARTIKELEN.length + ' artikelen geladen');
       } else {
         console.error('[Sheets] Fout:', data);
-        toonSheetsError('Fout bij laden: ' + (data.message || 'onbekend'));
+        laadUitCache('Sheets fout: ' + (data.message || 'onbekend'));
       }
     })
     .catch(err => {
       console.error('[Sheets] Netwerkfout:', err);
-      // Probeer cache als fallback
-      try {
-        const cached = localStorage.getItem('emondt_artikelen_cache');
-        if (cached) {
-          ARTIKELEN = JSON.parse(cached);
-          renderArtikelen(ARTIKELEN);
-          showToast('📵 Offline – cache gebruikt');
-          return;
-        }
-      } catch(e) {}
-      // Geen verbinding en geen cache
-      const lijst = document.getElementById('artikel-lijst');
-      if (lijst) lijst.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--danger);font-size:.86rem">📵 Geen verbinding en geen gecachte data beschikbaar.</div>';
-      showToast('📵 Geen verbinding – cache leeg');
+      laadUitCache('Geen verbinding met Sheets');
     });
 }
 
-function toonSheetsError(msg) {
-  console.warn('[Sheets]', msg);
+// Laad uit localStorage als noodoplossing, toon melding
+function laadUitCache(reden) {
+  try {
+    const cached = localStorage.getItem('emondt_artikelen_cache');
+    if (cached) {
+      ARTIKELEN = JSON.parse(cached);
+      try { sessionStorage.setItem('emondt_artikelen_sessie', cached); } catch(e) {}
+      bouwDrawerCats();
+      renderArtikelen(ARTIKELEN);
+      const ts = localStorage.getItem('emondt_artikelen_ts');
+      const leeftijd = ts ? Math.round((Date.now() - parseInt(ts)) / 60000) : '?';
+      showToast(`📦 Cache geladen (${leeftijd} min oud)`);
+      console.warn('[Cache] Fallback op cache vanwege:', reden);
+      return;
+    }
+  } catch(e) {}
+  // Echt niets beschikbaar
   const lijst = document.getElementById('artikel-lijst');
-  if (lijst) lijst.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--danger);font-size:.86rem">⚠️ ${msg}</div>`;
+  if (lijst) lijst.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--danger);font-size:.86rem">📵 ${reden} — geen cache beschikbaar.</div>`;
+  showToast('📵 Geen data beschikbaar');
 }
 
 // ── DRAWER ────────────────────────────────────────────────────
@@ -1057,7 +1062,17 @@ const DEV_PW = 'Eg@2026!#';
 function getSheetsUrl() {
   return window.SHEETS_API_URL_RUNTIME ||
     (() => { try { return localStorage.getItem('emondt_sheets_url') || ''; } catch(e){ return ''; } })() ||
-    (SHEETS_API_URL !== 'JOUW_WEBAPP_URL_HIER' ? SHEETS_API_URL : '');
+    SHEETS_API_URL;
+}
+
+// Alle schrijfacties via GET (geen POST — werkt altijd cross-origin)
+function sheetsRequest(params) {
+  const url = getSheetsUrl();
+  if (!url) return Promise.resolve({ status: 'geen_url' });
+  const qs = Object.entries(params)
+    .map(([k, v]) => `${k}=${encodeURIComponent(typeof v === 'object' ? JSON.stringify(v) : v)}`)
+    .join('&');
+  return fetch(`${url}?${qs}&t=${Date.now()}`).then(r => r.json());
 }
 
 function slaApiUrlOp() {
@@ -1075,7 +1090,7 @@ function testSheetsVerbinding() {
     status.innerHTML = '<span style="color:var(--danger)">⚠️ URL moet beginnen met https://script.google.com/macros/s/...</span>'; return;
   }
   status.innerHTML = '<span style="color:var(--muted)">⏳ Verbinding testen...</span>';
-  fetch(url + '?t=' + Date.now())
+  fetch(url + '?actie=lezen&t=' + Date.now())
     .then(r => {
       if (!r.ok) throw new Error(`HTTP ${r.status} – ${r.statusText}`);
       return r.json();
@@ -1272,18 +1287,9 @@ function devVerwijderArtikel(code) {
   devZoek();
 
   // Verwijder uit Sheets
-  const url = getSheetsUrl();
-  if (url) {
-    fetch(url, {
-      method: 'POST',
-      body: JSON.stringify({ actie: 'verwijderen', code })
-    })
-    .then(r => r.json())
-    .then(data => showToast(data.status === 'ok' ? '🗑 Verwijderd uit Sheets' : '⚠️ ' + (data.message||'')))
+  sheetsRequest({ actie: 'verwijderen', code })
+    .then(data => showToast(data.status === 'ok' ? '🗑 Verwijderd uit Sheets' : '⚠️ ' + (data.message||data.status)))
     .catch(() => showToast('🗑 Lokaal verwijderd (Sheets niet bereikbaar)'));
-  } else {
-    showToast('🗑 Verwijderd');
-  }
 }
 
 // ── CSV IMPORT ────────────────────────────────────────────────
@@ -1348,5 +1354,10 @@ window.addEventListener('appinstalled', () => {
   console.log('[PWA] App geïnstalleerd');
 });
 </script>
+<!-- ── FOOTER ── -->
+<footer style="text-align:center;padding:20px 16px;margin-top:8px;font-size:.72rem;color:var(--muted);letter-spacing:.06em;border-top:1px solid var(--border)">
+  Ontwerp en concept door Ruben Brinks
+</footer>
+
 </body>
 </html>
