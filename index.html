@@ -415,7 +415,7 @@
     <h2>🔗 Google Sheets koppeling</h2>
     <div class="csv-info">
       Plak hier de <strong>Web App URL</strong> van het Google Apps Script.<br>
-      Zie de installatiehandleiding (README) voor stap-voor-stap instructies. Link naar database: <a>https://docs.google.com/spreadsheets/d/1nVAoYUlm_MGBsFLvH2QsZmuZooqkxbsibreMykhPGws/edit?gid=0#gid=0</a>
+      Zie de installatiehandleiding (README) voor stap-voor-stap instructies.
     </div>
     <div class="field-row">
       <label>Web App URL</label>
@@ -476,111 +476,7 @@
   </div>
 
   <div class="info-card">
-    <h2>📂 CSV Importeren</h2>
-
-    <!-- Instructies -->
-    <div class="csv-info">
-      <strong>📋 Vereist kolomformaat (volgorde belangrijk):</strong><br>
-      <code>code , naam , cat , subcat , eenheid</code><br><br>
-      <strong>Kolom uitleg:</strong><br>
-      • <code>code</code> — Uniek artikelnummer (verplicht)<br>
-      • <code>naam</code> — Artikelomschrijving (verplicht)<br>
-      • <code>cat</code> — Categorie exact zoals in de app (verplicht)<br>
-      • <code>subcat</code> — Subcategorie (optioneel, mag leeg)<br>
-      • <code>eenheid</code> — bijv. stuk, meter, rol (optioneel, standaard: stuk)<br><br>
-      <strong>Geldige categorieën:</strong><br>
-      <code>Afvoermaterialen</code> · <code>Bevestigingsmateriaal</code> · <code>Diversen</code> · <code>Elektra</code> · <code>Isolatie</code> · <code>Koeltechnische hulpstukken</code> · <code>Koperleiding</code> · <code>Tape &amp; Lijmen</code> · <code>Waterzijdig</code><br><br>
-      <strong>Voorbeeld rijen:</strong><br>
-      <code>99XX0001,Koppelstuk 22mm,Koperleiding,Aircoleiding,stuk</code><br>
-      <code>EL-099,Verlengkabel 5m,Elektra,,stuk</code><br>
-      <code>ISO-050,Isolatiemat 50mm,Isolatie,,meter</code><br><br>
-      <strong>💡 Tips:</strong><br>
-      • Sla in Excel op als <em>CSV UTF-8 (kommagescheiden)</em><br>
-      • Geen headerrij nodig — begin direct met artikelen<br>
-      • Bestaande artikelnummers worden automatisch overgeslagen<br>
-      • Ongeldige categorieën worden als fout gemarkeerd
-    </div>
-
-    <!-- Template downloaden -->
-    <button class="btn btn-secondary" onclick="csvDownloadTemplate()" style="margin-bottom:8px">
-      ⬇️ Download lege CSV-template
-    </button>
-
-    <!-- Database exporteren -->
-    <button class="btn btn-secondary" onclick="csvExportDatabase()" style="margin-bottom:8px">
-      📤 Exporteer huidige database als CSV
-    </button>
-
-    <!-- Bestand kiezen -->
-    <input type="file" id="csv-file" accept=".csv,.txt" style="display:none" onchange="csvLaadVoorvertoning()" />
-    <button class="btn btn-primary" onclick="document.getElementById('csv-file').click()" style="margin-bottom:8px">
-      📂 Kies CSV-bestand
-    </button>
-
-    <!-- Bestandsnaam indicator -->
-    <div id="csv-bestandsnaam" style="font-size:.78rem;color:var(--muted);margin-bottom:8px;display:none">
-      📄 <span id="csv-naam-tekst"></span>
-    </div>
-
-    <!-- Preview tabel -->
-    <div id="csv-preview-wrap" style="display:none;margin-bottom:10px">
-      <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:6px">
-        Voorvertoning (<span id="csv-preview-count">0</span> rijen geladen)
-      </div>
-      <div style="overflow-x:auto;border-radius:6px;border:1px solid var(--border)">
-        <table id="csv-preview-tabel" style="width:100%;border-collapse:collapse;font-size:.76rem">
-          <thead>
-            <tr style="background:var(--navy);color:var(--white)">
-              <th style="padding:7px 10px;text-align:left;white-space:nowrap">#</th>
-              <th style="padding:7px 10px;text-align:left;white-space:nowrap">Code</th>
-              <th style="padding:7px 10px;text-align:left;white-space:nowrap">Naam</th>
-              <th style="padding:7px 10px;text-align:left;white-space:nowrap">Categorie</th>
-              <th style="padding:7px 10px;text-align:left;white-space:nowrap">Subcat</th>
-              <th style="padding:7px 10px;text-align:left;white-space:nowrap">Eenheid</th>
-              <th style="padding:7px 10px;text-align:left;white-space:nowrap">Status</th>
-            </tr>
-          </thead>
-          <tbody id="csv-preview-body"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Importeren knop (verschijnt na preview) -->
-    <button id="csv-import-btn" class="btn btn-primary" onclick="csvBevestigImport()" style="display:none;margin-bottom:8px">
-      ✅ Bevestig import
-    </button>
-    <button id="csv-annuleer-btn" class="btn btn-secondary" onclick="csvAnnuleer()" style="display:none;margin-bottom:8px">
-      ✕ Annuleren
-    </button>
-
-    <!-- Resultaat -->
-    <div id="csv-resultaat" style="font-size:.82rem;margin-top:4px"></div>
-  </div>
-    <div class="field-row">
-      <label>Naam</label>
-      <input type="text" id="edit-naam" />
-    </div>
-    <div class="field-row">
-      <label>Categorie</label>
-      <select id="edit-cat">
-        <option>Afvoermaterialen</option><option>Bevestigingsmateriaal</option>
-        <option>Diversen</option><option>Elektra</option><option>Isolatie</option>
-        <option>Koeltechnische hulpstukken</option><option>Koperleiding</option>
-        <option>Tape &amp; Lijmen</option><option>Waterzijdig</option>
-      </select>
-    </div>
-    <div class="field-row">
-      <label>Subcategorie</label>
-      <input type="text" id="edit-subcat" placeholder="Optioneel" />
-    </div>
-    <div style="display:flex;gap:8px;margin-top:4px">
-      <button class="btn btn-primary" onclick="devSlaBewerking()" style="margin-bottom:0;flex:1">💾 Opslaan</button>
-      <button class="btn btn-secondary" onclick="devAnnuleerBewerking()" style="margin-bottom:0;flex:1">✕ Annuleren</button>
-    </div>
-  </div>
-
-  <div class="info-card">
-    <h2>✏️🗑 Artikel zoeken &amp; bewerken / verwijderen</h2>
+    <h2>🗑 Artikel zoeken &amp; verwijderen</h2>
     <div class="field-row">
       <label>Zoek op naam of artikelnummer</label>
       <input type="text" id="dev-zoek" placeholder="bijv. PVC bocht of 6923049..." oninput="devZoek()" />
@@ -611,7 +507,7 @@
 <script>
 // ── GOOGLE SHEETS API ────────────────────────────────────────
 // Vervang de URL hieronder met jouw Web App URL na deployment
-const SHEETS_API_URL = 'JOUW_WEBAPP_URL_HIER';
+const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbx0Xo3P5yiFca3eocmEcS0xIU1eTAdv43J0zvAHmJBLgqGEm5srI1-KANx49w-QMD12jA/exec';
 
 
 let ARTIKELEN = [];  // wordt geladen vanuit Google Sheets (of fallback)
@@ -799,7 +695,7 @@ function bouwDrawerCats() {
   });
 
   // Update dev categorie-dropdowns dynamisch
-  ['dev-cat', 'edit-cat'].forEach(selId => {
+  ['dev-cat'].forEach(selId => {
     const sel = document.getElementById(selId);
     if (!sel) return;
     const huidig = sel.value;
@@ -1358,14 +1254,10 @@ function devZoek() {
         <strong style="font-size:.86rem;display:block;word-break:break-word">${a.naam}</strong>
         <span style="font-size:.7rem;color:var(--muted)">${a.code} · ${a.cat}${a.subcat ? ' › ' + a.subcat : ''}</span>
       </div>
-      <button data-code="${a.code}" class="btn-edit-artikel" style="background:var(--green);border:none;color:var(--navy);padding:6px 10px;border-radius:6px;cursor:pointer;font-size:.82rem;flex-shrink:0">✏️</button>
-      <button data-code="${a.code}" class="btn-del-artikel" style="background:#fdecea;border:1px solid #f5c6c2;color:var(--danger);padding:6px 10px;border-radius:6px;cursor:pointer;font-size:.82rem;flex-shrink:0">🗑</button>
+      <button data-code="${a.code}" class="btn-del-artikel" style="background:#fdecea;border:1px solid #f5c6c2;color:var(--danger);padding:6px 10px;border-radius:6px;cursor:pointer;font-size:.82rem;flex-shrink:0">🗑 Verwijderen</button>
     </div>`).join('');
 
   // Bind events via delegation-safe approach
-  res.querySelectorAll('.btn-edit-artikel').forEach(btn => {
-    btn.addEventListener('click', () => devBewerkArtikel(btn.dataset.code));
-  });
   res.querySelectorAll('.btn-del-artikel').forEach(btn => {
     btn.addEventListener('click', () => devVerwijderArtikel(btn.dataset.code));
   });
@@ -1396,325 +1288,17 @@ function devVerwijderArtikel(code) {
 
 // ── CSV IMPORT ────────────────────────────────────────────────
 // ── CSV IMPORT ────────────────────────────────────────────────
-const GELDIGE_CATS = ['Afvoermaterialen','Bevestigingsmateriaal','Diversen','Elektra',
-  'Isolatie','Koeltechnische hulpstukken','Koperleiding','Tape & Lijmen','Waterzijdig'];
+  // geparsde rijen voor voorvertoning en bevestiging
 
-let csvRijen = [];  // geparsde rijen voor voorvertoning en bevestiging
 
-function csvDownloadTemplate() {
-  const inhoud = [
-    '# Emondt Materiaalapp - CSV Template',
-    '# Kolommen: code,naam,cat,subcat,eenheid',
-    '# Verwijder deze regels (beginnen met #) voor het importeren',
-    '# Geldige categorieën: ' + GELDIGE_CATS.join(' | '),
-    '',
-    '99XX0001,Koppelstuk 22mm,Koperleiding,Aircoleiding,stuk',
-    'EL-099,Verlengkabel 5m,Elektra,,stuk',
-    'ISO-050,Isolatiemat 50mm,Isolatie,,meter',
-  ].join('\n');
-  const blob = new Blob([inhoud], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'emondt_artikel_template.csv';
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
-  showToast('⬇️ Template gedownload');
-}
 
-function csvExportDatabase() {
-  const datum = new Date().toLocaleDateString('nl-NL', {day:'2-digit',month:'2-digit',year:'numeric'}).replace(/\//g,'-');
 
-  // Helper: escape field voor CSV (quotes als het komma's of aanhalingstekens bevat)
-  const esc = v => {
-    const s = String(v || '');
-    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
-  };
 
-  const regels = [
-    `# Emondt Materiaalapp - Database export ${datum}`,
-    `# Totaal: ${ARTIKELEN.length} artikelen`,
-    `# Kolommen: code,naam,cat,subcat,eenheid,leverancier`,
-    '',
-    ...ARTIKELEN.map(a => [
-      esc(a.code),
-      esc(a.naam),
-      esc(a.cat),
-      esc(a.subcat || ''),
-      esc(a.eenheid || 'stuk'),
-      esc(a.leverancier || ''),
-    ].join(','))
-  ];
 
-  const inhoud = '\uFEFF' + regels.join('\n'); // BOM voor Excel UTF-8
-  const blob = new Blob([inhoud], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `emondt_database_${datum}.csv`;
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
-  showToast(`📤 ${ARTIKELEN.length} artikelen geëxporteerd`);
-}
 
-function csvParseerRegel(line) {
-  // Handles quoted fields with commas inside
-  const result = [];
-  let cur = '', inQ = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (c === '"') { inQ = !inQ; }
-    else if (c === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
-    else { cur += c; }
-  }
-  result.push(cur.trim());
-  return result;
-}
 
-function csvLaadVoorvertoning() {
-  const file = document.getElementById('csv-file').files[0];
-  if (!file) return;
 
-  // Toon bestandsnaam
-  document.getElementById('csv-bestandsnaam').style.display = 'block';
-  document.getElementById('csv-naam-tekst').textContent = `${file.name} (${(file.size/1024).toFixed(1)} KB)`;
-  document.getElementById('csv-resultaat').textContent = '';
-  document.getElementById('csv-import-btn').style.display = 'none';
-  document.getElementById('csv-annuleer-btn').style.display = 'none';
 
-  const reader = new FileReader();
-  reader.onload = e => {
-    // Try UTF-8, fall back gracefully
-    const tekst = e.target.result;
-    const regels = tekst.split(/\r?\n/).filter(l => l.trim() && !l.trim().startsWith('#'));
-
-    csvRijen = [];
-    const tbody = document.getElementById('csv-preview-body');
-    tbody.innerHTML = '';
-    let nOke = 0, nWaarschuwing = 0, nFout = 0;
-
-    regels.forEach((regel, i) => {
-      const delen = csvParseerRegel(regel);
-      const [code = '', naam = '', cat = '', subcat = '', eenheid = ''] = delen;
-
-      let status = '', kleur = '', toelichting = [];
-
-      // Validaties
-      if (!code) toelichting.push('Code ontbreekt');
-      if (!naam) toelichting.push('Naam ontbreekt');
-      if (!cat) toelichting.push('Categorie ontbreekt');
-      else if (!GELDIGE_CATS.includes(cat)) toelichting.push(`Onbekende categorie: "${cat}"`);
-      if (code && ARTIKELEN.find(a => a.code === code)) toelichting.push('Code bestaat al → overgeslagen');
-
-      const isBestaand = code && ARTIKELEN.find(a => a.code === code);
-      const isFout = !code || !naam || !cat;
-      const isOnbekendCat = cat && !GELDIGE_CATS.includes(cat);
-
-      if (isFout || isOnbekendCat) {
-        status = '❌ Fout'; kleur = '#fdecea'; nFout++;
-      } else if (isBestaand) {
-        status = '⚠️ Bestaat al'; kleur = '#fff8e1'; nWaarschuwing++;
-      } else {
-        status = '✅ OK'; kleur = '#f0f5d6'; nOke++;
-      }
-
-      csvRijen.push({ code, naam, cat, subcat, eenheid: eenheid || 'stuk', geldig: !isFout && !isOnbekendCat && !isBestaand });
-
-      const tr = document.createElement('tr');
-      tr.style.background = kleur;
-      tr.innerHTML = `
-        <td style="padding:6px 10px;border-bottom:1px solid var(--border)">${i+1}</td>
-        <td style="padding:6px 10px;border-bottom:1px solid var(--border);font-family:monospace;white-space:nowrap">${code||'—'}</td>
-        <td style="padding:6px 10px;border-bottom:1px solid var(--border);word-break:break-word;max-width:160px">${naam||'—'}</td>
-        <td style="padding:6px 10px;border-bottom:1px solid var(--border);white-space:nowrap">${cat||'—'}</td>
-        <td style="padding:6px 10px;border-bottom:1px solid var(--border)">${subcat||'—'}</td>
-        <td style="padding:6px 10px;border-bottom:1px solid var(--border)">${eenheid||'stuk'}</td>
-        <td style="padding:6px 10px;border-bottom:1px solid var(--border);white-space:nowrap;font-size:.75rem" title="${toelichting.join(', ')}">${status}${toelichting.length ? ' ⓘ' : ''}</td>`;
-      tbody.appendChild(tr);
-    });
-
-    document.getElementById('csv-preview-count').textContent = regels.length;
-    document.getElementById('csv-preview-wrap').style.display = 'block';
-
-    // Samenvatting
-    const res = document.getElementById('csv-resultaat');
-    res.innerHTML = `<span style="color:var(--anthracite)">
-      Geladen: <strong>${regels.length} rijen</strong> &nbsp;·&nbsp;
-      <span style="color:green">✅ ${nOke} importeerbaar</span> &nbsp;·&nbsp;
-      <span style="color:#e6a817">⚠️ ${nWaarschuwing} overgeslagen</span> &nbsp;·&nbsp;
-      <span style="color:var(--danger)">❌ ${nFout} fouten</span>
-    </span>`;
-
-    if (nOke > 0) {
-      document.getElementById('csv-import-btn').style.display = 'block';
-      document.getElementById('csv-import-btn').textContent = `✅ Bevestig import (${nOke} artikelen)`;
-      document.getElementById('csv-annuleer-btn').style.display = 'block';
-    }
-  };
-  reader.readAsText(file, 'UTF-8');
-}
-
-function csvBevestigImport() {
-  let toegevoegd = 0;
-  const nieuweArtikelen = [];
-  csvRijen.filter(r => r.geldig).forEach(r => {
-    const nieuw = { code: r.code, naam: r.naam, cat: r.cat, eenheid: r.eenheid, icon: ICONS[r.cat] || ICON_DEFAULTS[r.cat] || '📦' };
-    if (r.subcat) nieuw.subcat = r.subcat;
-    ARTIKELEN.push(nieuw);
-    nieuweArtikelen.push(nieuw);
-    toegevoegd++;
-  });
-  bouwDrawerCats();
-  document.getElementById('csv-resultaat').innerHTML =
-    `<span style="color:green;font-weight:600">✅ ${toegevoegd} artikel(en) lokaal geladen — opslaan in Sheets...</span>`;
-  document.getElementById('csv-import-btn').style.display = 'none';
-  document.getElementById('csv-annuleer-btn').style.display = 'none';
-  document.getElementById('csv-file').value = '';
-  csvRijen = [];
-  showToast(`✅ ${toegevoegd} artikelen geïmporteerd`);
-
-  // Verstuur naar Sheets
-  const url = getSheetsUrl();
-  if (!url || !nieuweArtikelen.length) return;
-  let verstuurd = 0;
-  nieuweArtikelen.forEach(artikel => {
-    fetch(url, { method: 'POST', body: JSON.stringify({ actie: 'toevoegen', artikel }) })
-      .then(r => r.json())
-      .then(() => {
-        verstuurd++;
-        if (verstuurd === nieuweArtikelen.length) {
-          document.getElementById('csv-resultaat').innerHTML =
-            `<span style="color:green;font-weight:600">✅ ${toegevoegd} artikel(en) opgeslagen in Google Sheets.</span>`;
-        }
-      })
-      .catch(() => {
-        document.getElementById('csv-resultaat').innerHTML =
-          `<span style="color:var(--danger)">⚠️ Lokaal geïmporteerd, maar Sheets niet bereikbaar.</span>`;
-      });
-  });
-}
-
-function csvAnnuleer() {
-  document.getElementById('csv-preview-wrap').style.display = 'none';
-  document.getElementById('csv-bestandsnaam').style.display = 'none';
-  document.getElementById('csv-import-btn').style.display = 'none';
-  document.getElementById('csv-annuleer-btn').style.display = 'none';
-  document.getElementById('csv-resultaat').textContent = '';
-  document.getElementById('csv-file').value = '';
-  csvRijen = [];
-}
-
-// ── ARTIKEL BEWERKEN ─────────────────────────────────────────
-function devBewerkArtikel(code) {
-  const a = ARTIKELEN.find(x => x.code === code);
-  if (!a) return;
-  document.getElementById('dev-edit-card').style.display = 'block';
-  document.getElementById('edit-code-orig').value = code;
-  document.getElementById('edit-code').value = a.code;
-  document.getElementById('edit-naam').value = a.naam;
-  document.getElementById('edit-cat').value = a.cat;
-  document.getElementById('edit-subcat').value = a.subcat || '';
-  document.getElementById('edit-eenheid').value = a.eenheid || 'stuk';
-  const elev = document.getElementById('edit-leverancier'); if (elev) elev.value = a.leverancier || '';
-  document.getElementById('dev-edit-card').scrollIntoView({behavior:'smooth', block:'start'});
-}
-
-function devSlaBewerking() {
-  const origCode = document.getElementById('edit-code-orig').value;
-  const idx = ARTIKELEN.findIndex(x => x.code === origCode);
-  if (idx === -1) { alert('Artikel niet gevonden.'); return; }
-  const newCode = document.getElementById('edit-code').value.trim();
-  const naam    = document.getElementById('edit-naam').value.trim();
-  const cat     = document.getElementById('edit-cat').value;
-  const subcat      = document.getElementById('edit-subcat').value.trim();
-  const eenheid     = document.getElementById('edit-eenheid').value.trim() || 'stuk';
-  const leverancier = document.getElementById('edit-leverancier')?.value.trim() || '';
-  if (!newCode || !naam) { alert('Code en naam zijn verplicht.'); return; }
-  // Check duplicate code (only if changed)
-  if (newCode !== origCode && ARTIKELEN.find(x => x.code === newCode)) {
-    alert('Dit artikelnummer bestaat al.'); return;
-  }
-  const bijgewerkt = { code: newCode, naam, cat, eenheid, icon: ICONS[cat] || ICON_DEFAULTS[cat] || '📦', ...(subcat ? {subcat} : {}), ...(leverancier ? {leverancier} : {}) };
-  ARTIKELEN[idx] = bijgewerkt;
-  // Update cart key if code changed
-  if (newCode !== origCode && cart[origCode] !== undefined) {
-    cart[newCode] = cart[origCode];
-    delete cart[origCode];
-    updateBadge();
-  }
-  bouwDrawerCats();
-  devAnnuleerBewerking();
-  devZoek();
-
-  // Verstuur naar Sheets
-  const url = getSheetsUrl();
-  if (url) {
-    fetch(url, {
-      method: 'POST',
-      body: JSON.stringify({ actie: 'bijwerken', code: origCode, artikel: bijgewerkt })
-    })
-    .then(r => r.json())
-    .then(data => showToast(data.status === 'ok' ? '✅ Bijgewerkt in Sheets' : '⚠️ Sheets: ' + (data.message||'')))
-    .catch(() => showToast('⚠️ Sheets niet bereikbaar'));
-  } else {
-    showToast('✓ Artikel bijgewerkt');
-  }
-}
-
-function devAnnuleerBewerking() {
-  document.getElementById('dev-edit-card').style.display = 'none';
-}
-
-</script>
-<!-- ── FOOTER ── -->
-<footer style="text-align:center;padding:20px 16px;margin-top:8px;font-size:.72rem;color:var(--muted);letter-spacing:.06em;border-top:1px solid var(--border)">
-  Ontworpen door Ruben Brinks
-</footer>
-
-<!-- ── PWA INSTALL BANNER ── -->
-<div id="pwa-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;background:var(--navy);border-top:2px solid var(--green);padding:14px 16px;z-index:9998;box-shadow:0 -4px 20px rgba(4,28,66,.3)">
-  <div style="display:flex;align-items:center;gap:12px;max-width:480px;margin:0 auto">
-    <img src="icon-192.png" style="width:40px;height:40px;border-radius:8px;flex-shrink:0" />
-    <div style="flex:1;min-width:0">
-      <div style="font-size:.88rem;color:var(--white);font-family:Questrial,sans-serif">Installeer de app</div>
-      <div style="font-size:.72rem;color:var(--muted);margin-top:2px">Voeg toe aan je beginscherm voor snelle toegang</div>
-    </div>
-    <button id="pwa-install-btn" style="background:var(--green);color:var(--navy);border:none;border-radius:6px;padding:8px 14px;font-family:Questrial,sans-serif;font-size:.82rem;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;flex-shrink:0">Installeren</button>
-    <button onclick="document.getElementById('pwa-banner').style.display='none';localStorage.setItem('pwa-banner-dismissed','1')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;font-size:1.1rem;flex-shrink:0">✕</button>
-  </div>
-</div>
-
-<!-- ── OFFLINE INDICATOR ── -->
-<div id="offline-bar" style="display:none;position:fixed;top:62px;left:0;right:0;background:#e6a817;color:#000;font-size:.75rem;text-align:center;padding:5px;z-index:150;letter-spacing:.05em">
-  📵 Geen internetverbinding – de app werkt offline door
-</div>
-
-<script>
-// ── SERVICE WORKER REGISTRATIE ────────────────────────────────
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
-      .then(reg => {
-        console.log('[PWA] Service Worker geregistreerd:', reg.scope);
-        // Check voor updates
-        reg.addEventListener('updatefound', () => {
-          const worker = reg.installing;
-          worker.addEventListener('statechange', () => {
-            if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-              // Nieuwe versie beschikbaar
-              if (confirm('Er is een update beschikbaar. Nu herladen?')) {
-                worker.postMessage({ type: 'SKIP_WAITING' });
-                window.location.reload();
-              }
-            }
-          });
-        });
-      })
-      .catch(err => console.log('[PWA] SW registratie mislukt:', err));
-  });
-}
-
-// ── ONLINE/OFFLINE STATUS ─────────────────────────────────────
-const offlineBar = document.getElementById('offline-bar');
 function updateOnlineStatus() {
   offlineBar.style.display = navigator.onLine ? 'none' : 'block';
 }
