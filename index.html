@@ -132,9 +132,9 @@
     .search-bar input:focus{background:transparent;border:none}
 
     /* LABELS */
-    .cat-label{font-size:.8rem;text-transform:uppercase;letter-spacing:.1em;color:var(--navy);font-weight:600;padding:14px 0 6px;border-top:1px solid var(--border);margin-top:4px}
+    .cat-label{font-size:.66rem;text-transform:uppercase;letter-spacing:.14em;color:var(--navy);padding:12px 0 5px;border-top:1px solid var(--border);margin-top:4px}
     .cat-label:first-child{border-top:none;margin-top:0;padding-top:0}
-    .subcat-label{font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;color:var(--white);background:var(--navy2);padding:6px 12px;border-radius:4px;margin:10px 0 5px;display:inline-block}
+    .subcat-label{font-size:.62rem;text-transform:uppercase;letter-spacing:.12em;color:var(--white);background:var(--navy2);padding:5px 10px;border-radius:4px;margin:10px 0 4px;display:inline-block}
 
     /* ARTIKEL KAART */
     .artikel-grid{display:flex;flex-direction:column;gap:8px}
@@ -306,8 +306,8 @@
         <strong style="color:rgba(255,255,255,.85)">Android (Chrome):</strong> tik op de drie puntjes rechtsboven → "Toevoegen aan beginscherm"<br>
         <strong style="color:rgba(255,255,255,.85)">iPhone / iPad (Safari):</strong> tik op het deelicoon <span style="font-size:.9rem">⎙</span> → "Zet op beginscherm"
       </div>
-      <button onclick="triggerPwaInstall()" id="landing-install-btn" style="margin-top:10px;background:var(--green);color:var(--navy);border:none;border-radius:6px;padding:8px 16px;font-family:'Questrial',sans-serif;font-size:.82rem;text-transform:uppercase;letter-spacing:.06em;cursor:pointer">
-        ⬇️ Installeer de app
+      <button onclick="triggerPwaInstall()" id="landing-install-btn" style="display:none;margin-top:10px;background:var(--green);color:var(--navy);border:none;border-radius:6px;padding:8px 16px;font-family:'Questrial',sans-serif;font-size:.82rem;text-transform:uppercase;letter-spacing:.06em;cursor:pointer">
+        ⬇️ Nu installeren
       </button>
     </div>
   </div>
@@ -327,8 +327,8 @@
       <input type="text" id="naam" placeholder="Jan de Vries" oninput="saveInfo()" />
     </div>
     <div class="field-row">
-      <label>Telefoonnummer <span class="req">*</span></label>
-      <input type="tel" id="telefoon" placeholder="Jouw telefoonnummer" oninput="saveInfo()" required />
+      <label>Telefoonnummer</label>
+      <input type="tel" id="telefoon" placeholder="Jouw telefoonnummer" oninput="saveInfo()" />
     </div>
     <div class="field-row">
       <label>Afdeling <span class="req">*</span></label>
@@ -517,7 +517,6 @@ function loadCart() {
     const opgeslagen = localStorage.getItem('emondt_cart');
     if (opgeslagen) cart = JSON.parse(opgeslagen);
   } catch(e) {}
-  updateBadge();
 }
 let activeCat = null;
 let customTeller = 0;
@@ -908,22 +907,15 @@ function verstuurEmail() {
   const inf = getInfo();
   const items = Object.entries(cart);
   if (!items.length) { alert('Voeg eerst artikelen toe.'); return; }
-  let leverdatum = '';
-  try { leverdatum = localStorage.getItem('leverdatum') || ''; } catch(e){}
   const verplicht = [
-    {id:'naam',label:'Naam'},{id:'telefoon',label:'Telefoonnummer'},
-    {id:'afdeling',label:'Afdeling'},{id:'projectnaam',label:'Projectnaam'},
-    {id:'locatie',label:'Afleveradres'},
+    {id:'naam',label:'Naam'},{id:'afdeling',label:'Afdeling'},
+    {id:'projectnaam',label:'Projectnaam'},{id:'locatie',label:'Afleveradres'},
   ];
   for (const v of verplicht) {
     if (!inf[v.id]||inf[v.id].trim()==='') {
       alert(`Vul het verplichte veld "${v.label}" in.`); showTab('info');
       document.getElementById(v.id).focus(); return;
     }
-  }
-  if (!leverdatum) {
-    alert('Selecteer een gewenste leverdatum in de winkelmand.');
-    showTab('winkelwagen'); return;
   }
   const nu = new Date();
   const uur = nu.getHours(), minuut = nu.getMinutes();
@@ -932,6 +924,8 @@ function verstuurEmail() {
     if (!confirm(`⚠️ Let op: het is nu ${tijdStr}\n\nBestellingen die na 14:00 binnenkomen worden verwerkt op de volgende werkdag.\n\nWil je toch versturen?`)) return;
   }
 
+  let leverdatum = '';
+  try { leverdatum = localStorage.getItem('leverdatum') || ''; } catch(e){}
   const datum = new Date().toLocaleDateString('nl-NL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
   const projref = inf.projectnummer || inf.projectnaam || '';
   const subject = `Materiaal bestellen${projref?' '+projref:''}${inf.projectnaam?' – '+inf.projectnaam:''} – ${inf.naam||'monteur'} – ${datum}`;
@@ -1430,11 +1424,7 @@ window.addEventListener('beforeinstallprompt', e => {
 });
 
 async function triggerPwaInstall() {
-  if (!deferredInstallPrompt) {
-    // iOS/Safari: geen install prompt beschikbaar — toon instructie
-    alert('Installeren op iPhone/iPad:\n\n1. Tik op het deelicoon ⎙ onderin Safari\n2. Scroll naar beneden\n3. Tik op "Zet op beginscherm"\n4. Tik op "Voeg toe"');
-    return;
-  }
+  if (!deferredInstallPrompt) return;
   deferredInstallPrompt.prompt();
   const { outcome } = await deferredInstallPrompt.userChoice;
   deferredInstallPrompt = null;
