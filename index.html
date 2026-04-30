@@ -282,7 +282,7 @@
       <div class="step-num">3</div>
       <div class="step-info">
         <h3>Bestelling versturen</h3>
-        <p>Tik rechtsbovenin op de 🛒 winkelmandknop om je bestelling te bekijken. Kies een gewenste leverdatum en tik op <strong>Versturen via E-mail</strong>.</p>
+        <p>Tik rechtsbovenin op de 🛒 winkelmandknop om je bestelling te bekijken. Kies een gewenste leverdatum en tik op <strong>Bestelling versturen</strong>.</p>
       </div>
     </div>
     <div class="landing-step">
@@ -484,7 +484,7 @@
 <script>
 // ── GOOGLE SHEETS API ────────────────────────────────────────
 // Vervang de URL hieronder met jouw Web App URL na deployment
-const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbweRgJ5CPxKdGWo-Vt0L9M5GwttLvQk3OqjPTjGr8hP8nlTKF4184eMwQCvMmw5Gtl67A/exec';
+const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbzoESGCrz5EX2QTYnfoC2tgbHIGzi761-XvQQ1jVCI-n9kn1ItGbbuOfi-FA--I5fPG9w/exec';
 
 
 let ARTIKELEN = [];  // wordt geladen vanuit Google Sheets (of fallback)
@@ -855,7 +855,7 @@ function renderCart() {
   </div>
   <button class="btn btn-primary" onclick="verstuurEmail()">
     <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M22 2 11 13M22 2 15 22l-4-9-9-4 20-7z"/></svg>
-    Versturen via E-mail
+    Bestelling versturen
   </button>
   <button class="btn btn-danger" onclick="leegMaken()">
     <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2"/></svg>
@@ -993,9 +993,11 @@ ${'='.repeat(46)}
 Emondt Materiaalapp · www.emondt.nl`;
 
   // ── Verstuur via mailto ───────────────────────────────────
-  window.location.href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  // ── Verstuur via Scripts (automatisch) of mailto (fallback) ──
+  // Script verstuurt de mail automatisch — geen mailto nodig
+  // logBestellingSheets handelt zowel mail als logging af
 
-  // ── Log bestelling in Google Sheets ──────────────────────
+  // ── Log bestelling in Google Sheets (+ mail via script) ──
   logBestellingSheets({
     datum,
     naam:          inf.naam,
@@ -1006,6 +1008,7 @@ Emondt Materiaalapp · www.emondt.nl`;
     locatie:       inf.locatie,
     leverdatum,
     opmerkingen:   inf.opmerkingen,
+    ontvanger2:    inf.ontvanger2 || '',
     items:         artikelItems,
   });
 
@@ -1018,7 +1021,7 @@ Emondt Materiaalapp · www.emondt.nl`;
     updateBadge();
     showTab('welkom');
   }, 800);
-  showToast('📧 E-mail geopend – bestelling gelogd');
+  showToast('⏳ Bestelling wordt verstuurd...');
 }
 
 // ── OPSLAAN / LADEN ───────────────────────────────────────────
@@ -1195,8 +1198,9 @@ function logBestellingSheets(data) {
   if (!url) return;
 
   // Comprimeer artikelen naar korte string: "code×qty|code×qty"
+  // Formaat: code×qty×naam|code×qty×naam
   const artikelStr = (data.items || [])
-    .map(i => `${i.code}×${i.qty}`)
+    .map(i => `${i.code}×${i.qty}×${(i.naam||'').replace(/[×|]/g,'')}`)
     .join('|');
 
   // Bouw compact payload — geen JSON nesting, directe parameters
@@ -1211,6 +1215,7 @@ function logBestellingSheets(data) {
     locatie:        data.locatie        || '',
     leverdatum:     data.leverdatum     || '',
     opmerkingen:    data.opmerkingen    || '',
+    ontvanger2:     data.ontvanger2     || '',
     artikelen:      artikelStr,
     totaal:         (data.items || []).reduce((s, i) => s + (parseInt(i.qty)||0), 0),
     t:              Date.now(),
@@ -1218,8 +1223,18 @@ function logBestellingSheets(data) {
 
   fetch(`${url}?${params.toString()}`)
     .then(r => r.json())
-    .then(r => console.log('[Sheets] Bestelling gelogd:', r.status))
-    .catch(err => console.warn('[Sheets] Log mislukt:', err.message));
+    .then(r => {
+      if (r.status === 'ok') {
+        showToast('✅ Bestelling verstuurd!');
+      } else {
+        showToast('⚠️ Fout: ' + (r.message || r.status));
+        console.warn('[Sheets] Fout:', r);
+      }
+    })
+    .catch(err => {
+      showToast('⚠️ Verbinding mislukt');
+      console.warn('[Sheets] Mislukt:', err.message);
+    });
 }
 
 
