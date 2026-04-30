@@ -28,7 +28,7 @@
   <meta name="author" content="Emondt Groep" />
 
   <!-- Microsoft / Windows -->
-  <meta name="mslication-TileColor" content="#041c42" />
+  <meta name="msapplication-TileColor" content="#041c42" />
   <meta name="msapplication-TileImage" content="icon-192.png" />
   <meta name="msapplication-tap-highlight" content="no" />
 
@@ -327,6 +327,10 @@
       <input type="text" id="naam" placeholder="Jan de Vries" oninput="saveInfo()" />
     </div>
     <div class="field-row">
+      <label>Telefoonnummer</label>
+      <input type="tel" id="telefoon" placeholder="Jouw telefoonnummer" oninput="saveInfo()" />
+    </div>
+    <div class="field-row">
       <label>Afdeling <span class="req">*</span></label>
       <select id="afdeling" onchange="saveInfo()">
         <option value="" disabled selected>Selecteer afdeling...</option>
@@ -419,8 +423,7 @@
     </div>
     <div class="field-row">
       <label>Web App URL</label>
-      <input type="url" id="sheets-url" value="https://script.google.com/macros/s/AKfycbwyXuMK_BusAIDv06QPwiYSSXcUae0xAINhUsFqMNMiXqOmcBDbb81jZBi7paRXPJYZJA/exec" readonly
-  style="font-size:.78rem;color:var(--muted);cursor:not-allowed;background:var(--bg)" />
+      <input type="url" id="sheets-url" placeholder="https://script.google.com/macros/s/.../exec"
         oninput="slaApiUrlOp()" style="font-size:.78rem" />
     </div>
     <div style="display:flex;gap:8px;margin-top:4px">
@@ -952,6 +955,8 @@ ${'='.repeat(46)}
 `;
   body += `Monteur:         ${inf.naam||'—'}
 `;
+  if (inf.telefoon) body += `Telefoon:        ${inf.telefoon}
+`;
   body += `Afdeling:        ${inf.afdeling||'—'}
 `;
   body += `Projectnummer:   ${inf.projectnummer||'—'}
@@ -1048,7 +1053,7 @@ function loadInfo() {
     // Nieuwe sessie = projectnummer en projectnaam wissen
     const nieuweSessione = !sessionStorage.getItem('sessie_gestart');
     sessionStorage.setItem('sessie_gestart', '1');
-    ['naam','afdeling','projectnummer','projectnaam','locatie','ontvanger2','opmerkingen'].forEach(id => {
+    ['naam','telefoon','afdeling','projectnummer','projectnaam','locatie','ontvanger2','opmerkingen'].forEach(id => {
       const el = document.getElementById(id);
       if (!el || id === 'ontvanger') return;
       if (nieuweSessione && (id === 'projectnummer' || id === 'projectnaam')) return; // wis bij nieuwe sessie
@@ -1077,7 +1082,7 @@ function loadInfo() {
   } catch(e){}
 }
 function getInfo() {
-  return ['naam','afdeling','projectnummer','projectnaam','locatie','ontvanger','ontvanger2','opmerkingen']
+  return ['naam','telefoon','afdeling','projectnummer','projectnaam','locatie','ontvanger','ontvanger2','opmerkingen']
     .reduce((o,id) => { const el = document.getElementById(id); if(el) o[id]=el.value; return o; }, {});
 }
 function showToast(msg) {
