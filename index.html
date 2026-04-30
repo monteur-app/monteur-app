@@ -1125,42 +1125,37 @@ function sheetsRequest(params) {
   return fetch(`${url}?${qs}&t=${Date.now()}`).then(r => r.json());
 }
 
-// Bestelling loggen via POST no-cors (geen URL-lengte beperking)
-// no-cors = geen response body beschikbaar, maar data komt wél aan
+// Bestelling loggen — compact GET request (werkt op alle platforms incl. PWA mobiel)
 function logBestellingSheets(data) {
   const url = getSheetsUrl();
   if (!url) return;
 
-  // Splits in twee requests als de data te groot is:
-  // 1) POST met no-cors voor het daadwerkelijk schrijven (betrouwbaar)
-  // 2) Fallback: GET met verkorte data als POST faalt
-  const payload = JSON.stringify({ actie: 'bestelling', ...data });
+  // Comprimeer artikelen naar korte string: "code×qty|code×qty"
+  const artikelStr = (data.items || [])
+    .map(i => `${i.code}×${i.qty}`)
+    .join('|');
 
-  fetch(url, {
-    method: 'POST',
-    mode: 'no-cors', // omzeilt CORS zonder preflight voor simple requests
-    headers: { 'Content-Type': 'text/plain' }, // text/plain = geen preflight
-    body: payload,
-  })
-  .then(() => console.log('[Sheets] Bestelling gelogd via POST'))
-  .catch(err => {
-    console.warn('[Sheets] POST mislukt, probeer GET:', err.message);
-    // Fallback: GET met alleen de essentiele velden (geen lange artikellijst)
-    const verkorteData = {
-      datum:         data.datum,
-      naam:          data.naam,
-      afdeling:      data.afdeling,
-      projectnummer: data.projectnummer,
-      projectnaam:   data.projectnaam,
-      locatie:       data.locatie,
-      leverdatum:    data.leverdatum,
-      opmerkingen:   data.opmerkingen,
-      items:         data.items?.slice(0, 20), // max 20 artikelen in GET
-    };
-    sheetsRequest({ actie: 'bestelling', data: verkorteData })
-      .then(r => console.log('[Sheets] Bestelling gelogd via GET fallback:', r.status))
-      .catch(e => console.warn('[Sheets] Log volledig mislukt:', e.message));
+  // Bouw compact payload — geen JSON nesting, directe parameters
+  const params = new URLSearchParams({
+    actie:          'bestelling',
+    datum:          data.datum          || '',
+    naam:           data.naam           || '',
+    telefoon:       data.telefoon       || '',
+    afdeling:       data.afdeling       || '',
+    projectnummer:  data.projectnummer  || '',
+    projectnaam:    data.projectnaam    || '',
+    locatie:        data.locatie        || '',
+    leverdatum:     data.leverdatum     || '',
+    opmerkingen:    data.opmerkingen    || '',
+    artikelen:      artikelStr,
+    totaal:         (data.items || []).reduce((s, i) => s + (parseInt(i.qty)||0), 0),
+    t:              Date.now(),
   });
+
+  fetch(`${url}?${params.toString()}`)
+    .then(r => r.json())
+    .then(r => console.log('[Sheets] Bestelling gelogd:', r.status))
+    .catch(err => console.warn('[Sheets] Log mislukt:', err.message));
 }
 
 function slaApiUrlOp() {
