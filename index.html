@@ -918,61 +918,110 @@ function verstuurEmail() {
     }
   }
 
-  // ── Waarschuwing na 14:00 ──────────────────────────────────
+  // ── Waarschuwing na 14:00 ─────────────────────────────────
   const nu = new Date();
   const uur = nu.getHours();
   const minuut = nu.getMinutes();
   if (uur >= 14) {
     const tijdStr = `${String(uur).padStart(2,'0')}:${String(minuut).padStart(2,'0')}`;
-    const doorgaan = confirm(
-      `⚠️ Let op: het is nu ${tijdStr}\n\n` +
-      `Bestellingen die na 14:00 binnenkomen worden verwerkt op de volgende werkdag.\n\n` +
-      `Wil je toch versturen?`
-    );
-    if (!doorgaan) return;
+    if (!confirm(`⚠️ Let op: het is nu ${tijdStr}
+
+Bestellingen die na 14:00 binnenkomen worden verwerkt op de volgende werkdag.
+
+Wil je toch versturen?`)) return;
   }
 
   let leverdatum = '';
   try { leverdatum = localStorage.getItem('leverdatum') || ''; } catch(e){}
+
   const datum = new Date().toLocaleDateString('nl-NL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-  let body = `MATERIAAL BESTELLEN – EMONDT GROEP\n${'='.repeat(46)}\n\n`;
-  body += `Datum:           ${datum}\n`;
-  if (leverdatum) body += `Gewenste leverdatum: ${new Date(leverdatum).toLocaleDateString('nl-NL',{day:'2-digit',month:'2-digit',year:'numeric'})}\n`;
-  body += `Monteur:         ${inf.naam||'—'}\n`;
-  body += `Afdeling:        ${inf.afdeling||'—'}\n`;
-  body += `Projectnummer:   ${inf.projectnummer||'—'}\n`;
-  body += `Projectnaam:     ${inf.projectnaam||'—'}\n`;
-  body += `Afleveradres:    ${inf.locatie||'—'}\n\n`;
-  body += `GEVRAAGDE ARTIKELEN\n${'─'.repeat(46)}\n`;
-  let totaal = 0;
+  const projref = inf.projectnummer || inf.projectnaam || '';
+  const subject = `Materiaal bestellen${projref?' '+projref:''}${inf.projectnaam?' – '+inf.projectnaam:''} – ${inf.naam||'monteur'} – ${datum}`;
+  const to = [inf.ontvanger, inf.ontvanger2].filter(Boolean).join(',');
+
+  // ── Bouw e-mailbody (platte tekst) ────────────────────────
   const cats = [...new Set(items.map(([code]) => ARTIKELEN.find(x=>x.code===code)?.cat).filter(Boolean))];
+  let body = `MATERIAAL BESTELLEN – EMONDT GROEP
+${'='.repeat(46)}
+
+`;
+  body += `Datum:           ${datum}
+`;
+  if (leverdatum) body += `Leverdatum:      ${new Date(leverdatum).toLocaleDateString('nl-NL',{day:'2-digit',month:'2-digit',year:'numeric'})}
+`;
+  body += `Monteur:         ${inf.naam||'—'}
+`;
+  body += `Afdeling:        ${inf.afdeling||'—'}
+`;
+  body += `Projectnummer:   ${inf.projectnummer||'—'}
+`;
+  body += `Projectnaam:     ${inf.projectnaam||'—'}
+`;
+  body += `Afleveradres:    ${inf.locatie||'—'}
+
+`;
+  body += `GEVRAAGDE ARTIKELEN
+${'─'.repeat(46)}
+`;
+  let totaal = 0;
+  const artikelItems = [];
   cats.forEach(cat => {
-    body += `\n[ ${cat.toUpperCase()} ]\n`;
-    items.forEach(([code,qty]) => {
+    body += `
+[ ${cat.toUpperCase()} ]
+`;
+    items.forEach(([code, qty]) => {
       const a = ARTIKELEN.find(x=>x.code===code);
-      if (!a||a.cat!==cat) return;
+      if (!a || a.cat !== cat) return;
       totaal += qty;
-      body += `  ${a.code.padEnd(12)} ${String(qty).padStart(4)} x  ${a.naam}\n`;
+      artikelItems.push({ code: a.code, naam: a.naam, cat: a.cat, qty });
+      body += `  ${a.code.padEnd(12)} ${String(qty).padStart(4)} x  ${a.naam}
+`;
     });
   });
-  body += `\n${'─'.repeat(46)}\nTOTAAL: ${totaal} artikelen\n`;
-  if (inf.opmerkingen) body += `\nOPMERKINGEN\n${inf.opmerkingen}\n`;
-  body += `\n${'='.repeat(46)}\nVerstuurd via Emondt Materiaal bestellen App\nwww.emondt.nl`;
-  const projref = inf.projectnummer||inf.projectnaam||'';
-  const subject = `Materiaal bestellen${projref?' '+projref:''}${inf.projectnaam?' – '+inf.projectnaam:''} – ${inf.naam||'monteur'} – ${datum}`;
-  // Bouw ontvangers
-  const to = [inf.ontvanger, inf.ontvanger2].filter(Boolean).join(',');
+  body += `
+${'─'.repeat(46)}
+TOTAAL: ${totaal} artikelen
+`;
+  if (inf.opmerkingen) body += `
+OPMERKINGEN
+${inf.opmerkingen}
+`;
+  body += `
+${'='.repeat(46)}
+Emondt Materiaalapp · www.emondt.nl`;
+
+  // ── Verstuur via mailto ───────────────────────────────────
   window.location.href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  // Winkelmand legen na versturen
+
+  // ── Log bestelling in Google Sheets ──────────────────────
+  const logData = {
+    datum,
+    naam:          inf.naam,
+    afdeling:      inf.afdeling,
+    projectnummer: inf.projectnummer,
+    projectnaam:   inf.projectnaam,
+    locatie:       inf.locatie,
+    leverdatum,
+    opmerkingen:   inf.opmerkingen,
+    items:         artikelItems,
+  };
+  sheetsRequest({ actie: 'bestelling', data: logData })
+    .then(data => {
+      if (data.status === 'ok') console.log('[Sheets] Bestelling gelogd');
+      else console.warn('[Sheets] Log fout:', data.message);
+    })
+    .catch(err => console.warn('[Sheets] Log niet bereikbaar:', err.message));
+
+  // ── Winkelmand legen ──────────────────────────────────────
   setTimeout(() => {
     cart = {};
-    try { localStorage.removeItem('leverdatum'); } catch(e){}
+    try { localStorage.removeItem('leverdatum'); localStorage.removeItem('emondt_cart'); } catch(e){}
     document.querySelectorAll('.qty-val').forEach(el => el.value = 0);
     document.querySelectorAll('.artikel-card').forEach(el => el.classList.remove('selected'));
     updateBadge();
     showTab('welkom');
   }, 800);
-  showToast('📧 E-mail app geopend – bestelling gewist');
+  showToast('📧 E-mail geopend – bestelling gelogd');
 }
 
 // ── OPSLAAN / LADEN ───────────────────────────────────────────
