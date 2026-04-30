@@ -1000,9 +1000,10 @@ Emondt Materiaalapp · www.emondt.nl`;
   window.location.href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
   // ── Log bestelling in Google Sheets ──────────────────────
-  const logData = {
+  logBestellingSheets({
     datum,
     naam:          inf.naam,
+    telefoon:      inf.telefoon,
     afdeling:      inf.afdeling,
     projectnummer: inf.projectnummer,
     projectnaam:   inf.projectnaam,
@@ -1010,13 +1011,7 @@ Emondt Materiaalapp · www.emondt.nl`;
     leverdatum,
     opmerkingen:   inf.opmerkingen,
     items:         artikelItems,
-  };
-  sheetsRequest({ actie: 'bestelling', data: logData })
-    .then(data => {
-      if (data.status === 'ok') console.log('[Sheets] Bestelling gelogd');
-      else console.warn('[Sheets] Log fout:', data.message);
-    })
-    .catch(err => console.warn('[Sheets] Log niet bereikbaar:', err.message));
+  });
 
   // ── Winkelmand legen ──────────────────────────────────────
   setTimeout(() => {
@@ -1128,6 +1123,44 @@ function sheetsRequest(params) {
     .map(([k, v]) => `${k}=${encodeURIComponent(typeof v === 'object' ? JSON.stringify(v) : v)}`)
     .join('&');
   return fetch(`${url}?${qs}&t=${Date.now()}`).then(r => r.json());
+}
+
+// Bestelling loggen via POST no-cors (geen URL-lengte beperking)
+// no-cors = geen response body beschikbaar, maar data komt wél aan
+function logBestellingSheets(data) {
+  const url = getSheetsUrl();
+  if (!url) return;
+
+  // Splits in twee requests als de data te groot is:
+  // 1) POST met no-cors voor het daadwerkelijk schrijven (betrouwbaar)
+  // 2) Fallback: GET met verkorte data als POST faalt
+  const payload = JSON.stringify({ actie: 'bestelling', ...data });
+
+  fetch(url, {
+    method: 'POST',
+    mode: 'no-cors', // omzeilt CORS zonder preflight voor simple requests
+    headers: { 'Content-Type': 'text/plain' }, // text/plain = geen preflight
+    body: payload,
+  })
+  .then(() => console.log('[Sheets] Bestelling gelogd via POST'))
+  .catch(err => {
+    console.warn('[Sheets] POST mislukt, probeer GET:', err.message);
+    // Fallback: GET met alleen de essentiele velden (geen lange artikellijst)
+    const verkorteData = {
+      datum:         data.datum,
+      naam:          data.naam,
+      afdeling:      data.afdeling,
+      projectnummer: data.projectnummer,
+      projectnaam:   data.projectnaam,
+      locatie:       data.locatie,
+      leverdatum:    data.leverdatum,
+      opmerkingen:   data.opmerkingen,
+      items:         data.items?.slice(0, 20), // max 20 artikelen in GET
+    };
+    sheetsRequest({ actie: 'bestelling', data: verkorteData })
+      .then(r => console.log('[Sheets] Bestelling gelogd via GET fallback:', r.status))
+      .catch(e => console.warn('[Sheets] Log volledig mislukt:', e.message));
+  });
 }
 
 function slaApiUrlOp() {
