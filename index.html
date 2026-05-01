@@ -327,8 +327,8 @@
       <input type="text" id="naam" placeholder="Jan de Vries" oninput="saveInfo()" />
     </div>
     <div class="field-row">
-      <label>Telefoonnummer <span class="req">*</span></label>
-      <input type="tel" id="telefoon" placeholder="Jouw telefoonnummer" oninput="saveInfo()" required />
+      <label>Telefoonnummer</label>
+      <input type="tel" id="telefoon" placeholder="Jouw telefoonnummer" oninput="saveInfo()" />
     </div>
     <div class="field-row">
       <label>Afdeling <span class="req">*</span></label>
@@ -363,7 +363,12 @@
   <div class="info-card">
     <h2>Verzenden naar</h2>
     <div class="field-row">
-      <label>Jouw e-mailadres (CC)</label>
+      <label>E-mail ontvanger 1</label>
+      <input type="email" id="ontvanger" value="rubenbrinks1@gmail.com" readonly
+        style="color:var(--muted);cursor:not-allowed;background:var(--bg)" />
+    </div>
+    <div class="field-row">
+      <label>E-mail ontvanger 2 (optioneel)</label>
       <input type="email" id="ontvanger2" placeholder="jouw e-mailadres" oninput="saveInfo()" />
     </div>
     <div class="field-row">
@@ -479,7 +484,7 @@
 <script>
 // ── GOOGLE SHEETS API ────────────────────────────────────────
 // Vervang de URL hieronder met jouw Web App URL na deployment
-const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbweRgJ5CPxKdGWo-Vt0L9M5GwttLvQk3OqjPTjGr8hP8nlTKF4184eMwQCvMmw5Gtl67A/exec';
+const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbxcBmfIZCmf0HCV-5xPDyjz8zwqR7zzUatU017QdupZf1Oh3GDCv1wC-pLYAI-mNgho0w/exec';
 
 
 let ARTIKELEN = [];  // wordt geladen vanuit Google Sheets (of fallback)
@@ -902,21 +907,9 @@ function verstuurEmail() {
   const inf = getInfo();
   const items = Object.entries(cart);
   if (!items.length) { alert('Voeg eerst artikelen toe.'); return; }
-  // Locatie: gebruik dropdown of vrij tekstveld
-  const locatieKeuzeEl = document.getElementById('locatie-keuze');
-  const locatieWaarde = locatieKeuzeEl?.value === 'vrij'
-    ? inf.locatie
-    : locatieKeuzeEl?.value || inf.locatie || '';
-  if (!locatieWaarde || locatieWaarde.trim() === '') {
-    alert('Selecteer een afleveradres.');
-    showTab('info'); return;
-  }
-  // Zet de correcte locatiewaarde in inf
-  inf.locatie = locatieWaarde;
-
   const verplicht = [
-    {id:'naam',label:'Naam'},{id:'telefoon',label:'Telefoonnummer'},
-    {id:'afdeling',label:'Afdeling'},{id:'projectnaam',label:'Projectnaam'},
+    {id:'naam',label:'Naam'},{id:'afdeling',label:'Afdeling'},
+    {id:'projectnaam',label:'Projectnaam'},{id:'locatie',label:'Afleveradres'},
   ];
   for (const v of verplicht) {
     if (!inf[v.id]||inf[v.id].trim()==='') {
@@ -924,23 +917,27 @@ function verstuurEmail() {
       document.getElementById(v.id).focus(); return;
     }
   }
-  let leverdatum = '';
-  try { leverdatum = localStorage.getItem('leverdatum') || ''; } catch(e){}
-  if (!leverdatum) {
-    alert('Selecteer een gewenste leverdatum in de winkelmand.');
-    showTab('winkelwagen'); return;
-  }
+
+  // ── Waarschuwing na 14:00 ─────────────────────────────────
   const nu = new Date();
-  const uur = nu.getHours(), minuut = nu.getMinutes();
+  const uur = nu.getHours();
+  const minuut = nu.getMinutes();
   if (uur >= 14) {
     const tijdStr = `${String(uur).padStart(2,'0')}:${String(minuut).padStart(2,'0')}`;
-    if (!confirm(`⚠️ Let op: het is nu ${tijdStr}\n\nBestellingen die na 14:00 binnenkomen worden verwerkt op de volgende werkdag.\n\nWil je toch versturen?`)) return;
+    if (!confirm(`⚠️ Let op: het is nu ${tijdStr}
+
+Bestellingen die na 14:00 binnenkomen worden verwerkt op de volgende werkdag.
+
+Wil je toch versturen?`)) return;
   }
+
+  let leverdatum = '';
+  try { leverdatum = localStorage.getItem('leverdatum') || ''; } catch(e){}
 
   const datum = new Date().toLocaleDateString('nl-NL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
   const projref = inf.projectnummer || inf.projectnaam || '';
   const subject = `Materiaal bestellen${projref?' '+projref:''}${inf.projectnaam?' – '+inf.projectnaam:''} – ${inf.naam||'monteur'} – ${datum}`;
-  const to = inf.ontvanger2 || '';
+  const to = [inf.ontvanger, inf.ontvanger2].filter(Boolean).join(',');
 
   // ── Bouw e-mailbody (platte tekst) ────────────────────────
   const cats = [...new Set(items.map(([code]) => ARTIKELEN.find(x=>x.code===code)?.cat).filter(Boolean))];
@@ -1042,12 +1039,7 @@ function locatieKeuze(sel) {
 }
 
 function saveInfo() {
-  try {
-    // Sla alleen naam en telefoon op — rest per sessie invullen
-    const alles = getInfo();
-    const onthouden = { naam: alles.naam, telefoon: alles.telefoon };
-    localStorage.setItem('emondt_info', JSON.stringify(onthouden));
-  } catch(e) {}
+  try { localStorage.setItem('emondt_info', JSON.stringify(getInfo())); } catch(e){}
 }
 function loadInfo() {
   try {
@@ -1057,7 +1049,7 @@ function loadInfo() {
     sessionStorage.setItem('sessie_gestart', '1');
     ['naam','telefoon','afdeling','projectnummer','projectnaam','locatie','ontvanger2','opmerkingen'].forEach(id => {
       const el = document.getElementById(id);
-      if (!el) return;
+      if (!el || id === 'ontvanger') return;
       if (nieuweSessione && (id === 'projectnummer' || id === 'projectnaam')) return; // wis bij nieuwe sessie
       if (s[id]) el.value = s[id];
     });
@@ -1084,7 +1076,7 @@ function loadInfo() {
   } catch(e){}
 }
 function getInfo() {
-  return ['naam','telefoon','afdeling','projectnummer','projectnaam','locatie','ontvanger2','opmerkingen']
+  return ['naam','telefoon','afdeling','projectnummer','projectnaam','locatie','ontvanger','ontvanger2','opmerkingen']
     .reduce((o,id) => { const el = document.getElementById(id); if(el) o[id]=el.value; return o; }, {});
 }
 function showToast(msg) {
@@ -1465,31 +1457,6 @@ window.addEventListener('appinstalled', () => {
   deferredInstallPrompt = null;
   console.log('[PWA] App geïnstalleerd');
 });
-</script>
-
-<script>
-// ── SERVICE WORKER ────────────────────────────────────────────
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
-      .then(reg => {
-        // Forceer update check bij elke load
-        reg.update();
-        reg.addEventListener('updatefound', () => {
-          const worker = reg.installing;
-          worker.addEventListener('statechange', () => {
-            if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-              worker.postMessage('SKIP_WAITING');
-              navigator.serviceWorker.addEventListener('controllerchange', () => {
-                window.location.reload();
-              });
-            }
-          });
-        });
-      })
-      .catch(err => console.warn('[PWA] SW fout:', err));
-  });
-}
 </script>
 <!-- ── FOOTER ── -->
 <footer style="text-align:center;padding:20px 16px;margin-top:8px;font-size:.72rem;color:var(--muted);letter-spacing:.06em;border-top:1px solid var(--border)">
