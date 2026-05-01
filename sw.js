@@ -1,6 +1,77 @@
 // ── Emondt Materiaalapp – Service Worker ──────────────────────
-// Versie: bump dit getal na elke app-update om cache te vernieuwen
-const CACHE_NAAM = 'emondt-materiaalapp-v2.1.3';
+const CACHE_NAAM = 'emondt-materiaalapp-v5';
+
+// Alleen statische assets cachen — NOOIT index.html
+const ASSETS = [
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
+  './apple-touch-icon.png',
+  './favicon-32.png',
+];
+
+// ── INSTALL ───────────────────────────────────────────────────
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAAM)
+      .then(cache => cache.addAll(ASSETS))
+      .then(() => self.skipWaiting())
+  );
+});
+
+// ── ACTIVATE: verwijder alle oude caches ──────────────────────
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(namen => Promise.all(
+        namen.filter(n => n !== CACHE_NAAM).map(n => caches.delete(n))
+      ))
+      .then(() => self.clients.claim())
+  );
+});
+
+// ── FETCH ─────────────────────────────────────────────────────
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
+
+  const url = new URL(event.request.url);
+
+  // index.html en navigatie: ALTIJD van het netwerk — nooit uit cache
+  if (event.request.destination === 'document' ||
+      url.pathname.endsWith('index.html') ||
+      url.pathname === '/' || url.pathname === '') {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-store' })
+        .catch(() => caches.match('./index.html'))
+    );
+    return;
+  }
+
+  // Externe requests (Sheets API, fonts): altijd netwerk
+  if (url.origin !== self.location.origin) {
+    event.respondWith(
+      fetch(event.request).catch(() => new Response('', { status: 503 }))
+    );
+    return;
+  }
+
+  // Statische assets (iconen, manifest): cache-first
+  event.respondWith(
+    caches.match(event.request).then(cached => {
+      if (cached) return cached;
+      return fetch(event.request).then(res => {
+        if (res && res.status === 200) {
+          caches.open(CACHE_NAAM).then(c => c.put(event.request, res.clone()));
+        }
+        return res;
+      });
+    })
+  );
+});
+
+self.addEventListener('message', event => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
+});
 
 // Bestanden die offline beschikbaar moeten zijn
 const TE_CACHEN = [
@@ -20,7 +91,6 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAAM).then(cache => {
       console.log('[SW] Bestanden in cache opslaan...');
-      // Fonts zijn cross-origin, cache ze apart met no-cors
       const lokaal = TE_CACHEN.filter(url => !url.startsWith('http'));
       const extern = TE_CACHEN.filter(url => url.startsWith('http'));
       return cache.addAll(lokaal).then(() =>
@@ -28,7 +98,7 @@ self.addEventListener('install', event => {
           extern.map(url =>
             fetch(url, { mode: 'no-cors' })
               .then(res => cache.put(url, res))
-              .catch(() => {}) // Fonts zijn optioneel
+              .catch(() => {})
           )
         )
       );
@@ -59,28 +129,22 @@ self.addEventListener('activate', event => {
 });
 
 // ── FETCH: Cache-first strategie ──────────────────────────────
-// Probeer eerst de cache, dan het netwerk.
-// Zo werkt de app volledig offline na het eerste bezoek.
 self.addEventListener('fetch', event => {
-  // Sla POST-verzoeken (mailto) over
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) {
-        // Gevonden in cache: stuur terug en update op achtergrond
-        const netFetch = fetch(event.request)
+        fetch(event.request)
           .then(res => {
             if (res && res.status === 200 && res.type !== 'opaque') {
               caches.open(CACHE_NAAM).then(cache => cache.put(event.request, res.clone()));
             }
-            return res;
           })
-          .catch(() => {}); // Geen netwerk = geen probleem, cache volstaat
+          .catch(() => {});
         return cached;
       }
 
-      // Niet in cache: probeer netwerk, sla daarna op in cache
       return fetch(event.request)
         .then(res => {
           if (!res || res.status !== 200) return res;
@@ -89,7 +153,6 @@ self.addEventListener('fetch', event => {
           return res;
         })
         .catch(() => {
-          // Offline en niet gecached: toon de app-pagina als fallback
           if (event.request.destination === 'document') {
             return caches.match('./index.html');
           }
@@ -98,22 +161,7 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// ── SYNC: Achtergrond-sync (toekomstige uitbreiding) ──────────
-self.addEventListener('sync', event => {
-  if (event.tag === 'sync-bestellingen') {
-    console.log('[SW] Achtergrond sync getriggerd');
-    // Uitbreidbaar: verstuur gecachte bestellingen als online
-  }
-});
-
-// ── PUSH: Notificaties (toekomstige uitbreiding) ──────────────
-self.addEventListener('push', event => {
-  const data = event.data?.json() || {};
-  event.waitUntil(
-    self.registration.showNotification(data.title || 'Emondt', {
-      body: data.body || '',
-      icon: './icon-192.png',
-      badge: './favicon-32.png',
-    })
-  );
+// ── Update melding ────────────────────────────────────────────
+self.addEventListener('message', event => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
