@@ -902,10 +902,21 @@ function verstuurEmail() {
   const inf = getInfo();
   const items = Object.entries(cart);
   if (!items.length) { alert('Voeg eerst artikelen toe.'); return; }
+  // Locatie: gebruik dropdown of vrij tekstveld
+  const locatieKeuzeEl = document.getElementById('locatie-keuze');
+  const locatieWaarde = locatieKeuzeEl?.value === 'vrij'
+    ? inf.locatie
+    : locatieKeuzeEl?.value || inf.locatie || '';
+  if (!locatieWaarde || locatieWaarde.trim() === '') {
+    alert('Selecteer een afleveradres.');
+    showTab('info'); return;
+  }
+  // Zet de correcte locatiewaarde in inf
+  inf.locatie = locatieWaarde;
+
   const verplicht = [
     {id:'naam',label:'Naam'},{id:'telefoon',label:'Telefoonnummer'},
     {id:'afdeling',label:'Afdeling'},{id:'projectnaam',label:'Projectnaam'},
-    {id:'locatie',label:'Afleveradres'},
   ];
   for (const v of verplicht) {
     if (!inf[v.id]||inf[v.id].trim()==='') {
