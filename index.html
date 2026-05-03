@@ -338,7 +338,7 @@
     .modus-a .artikel-top-rij{display:contents}
 
     /* ═══ MODUS B – KAART MET ZONES ═════════════════════════════ */
-    .modus-b .artikel-card{padding:0;overflow:hidden;flex-direction:column;gap:0}
+    .modus-b .artikel-card{padding:0;overflow:visible;flex-direction:column;gap:0}
     .modus-b .artikel-top-rij{padding:13px 14px 10px;display:flex;align-items:flex-start;gap:12px}
     .modus-b .artikel-img{width:48px;height:48px;font-size:1.4rem}
     .modus-b .artikel-naam{font-size:.95rem}
@@ -448,19 +448,32 @@
     .qty-val:focus{border-color:var(--navy);background:var(--white)}
     .artikel-card.selected .qty-val{border-color:var(--green);background:var(--white)}
 
-    /* ═══ VERPAKKING POPUP ══════════════════════════════════════ */
-
-    /* ═══ VERPAKKING POPUP ══════════════════════════════════════ */
+    /* ═══ INFO KNOP + VERPAKKING POPUP ══════════════════════════ */
+    .artikel-info-btn{
+      width:28px;height:28px;border-radius:50%;
+      border:1.5px solid var(--border);background:var(--bg);
+      color:var(--muted);font-size:.75rem;font-weight:700;
+      display:flex;align-items:center;justify-content:center;
+      cursor:pointer;flex-shrink:0;transition:all .15s;
+      font-family:'DM Sans',sans-serif;line-height:1;
+    }
+    .artikel-info-btn:active{background:var(--navy);color:var(--white);border-color:var(--navy)}
+    .artikel-card.selected .artikel-info-btn{border-color:var(--green)}
     .verpakking-popup{
       position:absolute;bottom:calc(100% + 8px);left:0;right:0;
       background:var(--navy);color:var(--white);
-      font-size:.84rem;padding:10px 14px;
+      font-size:.84rem;padding:12px 14px;
       border-radius:10px;box-shadow:var(--shadow-lg);
-      z-index:50;line-height:1.5;pointer-events:none;
+      z-index:50;line-height:1.6;
     }
     .verpakking-popup::after{
       content:'';position:absolute;top:100%;left:24px;
       border:6px solid transparent;border-top-color:var(--navy);
+    }
+    .verpakking-link{
+      display:inline-flex;align-items:center;gap:5px;
+      margin-top:8px;color:var(--green);font-size:.8rem;font-weight:600;
+      text-decoration:none;
     }
 
     /* ═══ PWA INSTALLATIE UITLEG ════════════════════════════════ */
@@ -1767,6 +1780,8 @@ function renderArtikelCard(artikel, container) {
     ? `<div class="artikel-warning-tag"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Let op, bestellen per meter!</div>`
     : '';
 
+  const infoBtn = `<button class="artikel-info-btn" onclick="event.stopPropagation();toonVerpakking(event,document.getElementById('card-${artikel.code}'))" title="Info">i</button>`;
+
   const el = document.createElement('div');
   el.className = 'artikel-card' + (qty > 0 ? ' selected' : '');
   el.id = 'card-' + artikel.code;
@@ -1780,10 +1795,9 @@ function renderArtikelCard(artikel, container) {
 
   if (weergaveModus === 'a') {
     el.innerHTML = `
-      <div class="artikel-img">${iconHTML}</div>
       <div class="artikel-body">
-        <div class="artikel-naam">${artikel.naam} ${linkBtn}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:0 8px;margin-top:2px">
+        <div class="artikel-naam">${artikel.naam}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:0 8px;margin-top:2px;align-items:center">
           <span style="font-size:.72rem;color:var(--muted)">${artikel.code}</span>
           ${artikel.leverancier ? `<span style="font-size:.72rem;color:var(--muted)">· ${artikel.leverancier}</span>` : ''}
           <span style="font-size:.72rem;color:var(--muted)">· per ${artikel.eenheid}</span>
@@ -1791,16 +1805,18 @@ function renderArtikelCard(artikel, container) {
       </div>
       <div class="qty-wrap" onclick="event.stopPropagation()">
         <button class="qty-btn" onclick="changeQty('${artikel.code}',-1,event)">−</button>
-        <input class="qty-val" type="number" min="0" id="qty-${artikel.code}" value="${qty || 0}" onchange="setQty('${artikel.code}',this)" onclick="this.select()" />
+        <input class="qty-val" type="number" min="0" id="qty-${artikel.code}" value="${qty || 0}" onchange="setQty('${artikel.code}',this)" onclick="this.select()" style="width:34px;font-size:.9rem" />
         <button class="qty-btn" onclick="changeQty('${artikel.code}',1,event)">+</button>
-      </div>`;
+      </div>
+      ${infoBtn}`;
 
   } else if (weergaveModus === 'b') {
     el.innerHTML = `
       <div class="artikel-top-rij">
-        <div class="artikel-img">${iconHTML}</div>
         <div class="artikel-body">
-          <div class="artikel-naam">${artikel.naam} ${linkBtn}</div>
+          <div class="artikel-naam" style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+            <span>${artikel.naam}</span>${infoBtn}
+          </div>
           <div class="artikel-details">
             <div class="artikel-detail-rij"><span class="artikel-detail-label">Artikelnr.</span><span class="artikel-detail-val">${artikel.code}</span></div>
             ${artikel.leverancier ? `<div class="artikel-detail-rij"><span class="artikel-detail-label">Leverancier</span><span class="artikel-detail-val">${artikel.leverancier}</span></div>` : ''}
@@ -1813,10 +1829,11 @@ function renderArtikelCard(artikel, container) {
 
   } else {
     el.innerHTML = `
-      <div class="artikel-ico-blok">${iconHTML}</div>
       <div class="artikel-rechts">
         <div class="artikel-info-zone">
-          <div class="artikel-naam">${artikel.naam} ${linkBtn}</div>
+          <div class="artikel-naam" style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+            <span>${artikel.naam}</span>${infoBtn}
+          </div>
           <div class="artikel-meta-rij">${artikel.code}${artikel.leverancier ? ' · ' + artikel.leverancier : ''} · per ${artikel.eenheid}</div>
           ${warningTag}
         </div>
@@ -1825,19 +1842,29 @@ function renderArtikelCard(artikel, container) {
   }
 
   el.dataset.verpakking = artikel.verpakking || '';
-  if (artikel.verpakking) el.onclick = (e) => toonVerpakking(e, el);
+  el.dataset.link = artikel.link || '';
+  el.dataset.naam = artikel.naam || '';
+  el.onclick = null;
   container.appendChild(el);
 }
 
 function toonVerpakking(e, kaart) {
-  if (e.target.closest('.qty-wrap') || e.target.closest('.artikel-link-btn')) return;
+  if (e.target.closest('.qty-wrap')) return;
+  e.stopPropagation();
   document.querySelectorAll('.verpakking-popup').forEach(p => p.remove());
-  const tekst = kaart.dataset.verpakking;
-  if (!tekst) return;
+
+  const naam = kaart.dataset.naam || kaart.querySelector('.artikel-naam span, .artikel-naam')?.textContent?.trim() || '';
+  const verpakking = kaart.dataset.verpakking;
+  const link = kaart.dataset.link;
+
   const popup = document.createElement('div');
   popup.className = 'verpakking-popup';
-  popup.textContent = '📦 Verpakking: ' + tekst;
+  popup.innerHTML = `
+    <strong style="display:block;font-size:.88rem;margin-bottom:${verpakking || link ? '8px' : '0'}">${naam}</strong>
+    ${verpakking ? `<div style="font-size:.8rem;opacity:.85;margin-bottom:${link ? '8px' : '0'}">📦 Verpakking: ${verpakking}</div>` : ''}
+    ${link ? `<a href="${link}" target="_blank" class="verpakking-link" onclick="event.stopPropagation()">↗ Open productpagina</a>` : ''}`;
   kaart.appendChild(popup);
+
   setTimeout(() => {
     document.addEventListener('click', function sluiter() {
       popup.remove();
@@ -1912,10 +1939,9 @@ function renderCart() {
     const a = ARTIKELEN.find(x => x.code === code); if (!a) return;
     totaal += qty;
     html += `<div class="cart-item">
-      <div class="artikel-img" style="width:38px;height:38px;font-size:1rem;flex-shrink:0">${a.icon}</div>
       <div class="cart-info">
-        <div class="cart-naam">${a.naam}</div>
-        <div class="cart-code">${a.code}</div>
+        <div class="cart-naam">${a.naam}${a.link ? `<a href="${a.link}" target="_blank" onclick="event.stopPropagation()" class="artikel-link-btn" style="margin-left:6px">↗</a>` : ''}</div>
+        <div class="cart-code">${a.code}${a.leverancier ? ' · ' + a.leverancier : ''} · per ${a.eenheid}</div>
       </div>
       <div class="cart-badge">${qty}</div>
       <button class="del-btn" onclick="removeItem('${code}')">
